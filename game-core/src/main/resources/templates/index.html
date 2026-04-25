@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>GeoStrat - Клеточная стратегия</title>
+    <style>
+        body { font-family: Arial; margin: 20px; background: #1a1a2e; color: white; }
+        .game-container { display: flex; gap: 20px; }
+        #map {
+            display: grid;
+            grid-template-columns: repeat(10, 50px);
+            background: #16213e;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            border: 1px solid #0f3460;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            transition: 0.2s;
+        }
+        .cell:hover { opacity: 0.8; transform: scale(0.95); }
+        .cell.selected { border: 3px solid yellow; background: #e94560; }
+        .player1 { background: #dc2626; }
+        .player2 { background: #3b82f6; }
+        .neutral { background: #475569; }
+        .water { background: #0ea5e9; }
+        .info-panel { background: #1e293b; padding: 20px; border-radius: 10px; min-width: 250px; }
+        button { background: #e94560; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; }
+        button:hover { background: #ff6b6b; }
+        select, input { padding: 5px; margin: 5px; }
+        .troops { font-weight: bold; color: #fbbf24; }
+    </style>
+</head>
+<body>
+<h1>⚔️ GeoStrat - Клеточная стратегия</h1>
+<div class="game-container">
+    <div id="map"></div>
+    <div class="info-panel">
+        <h2>📊 Информация</h2>
+        <div id="selected-info">Выберите клетку</div>
+        <hr>
+        <h3>👥 Игроки</h3>
+        <div th:each="player : ${players}">
+            <div style="margin: 10px 0">
+                <strong th:text="${player.name}"></strong><br>
+                Клеток: <span th:text="${player.capturedCellIds.size()}"></span><br>
+                Побед: <span th:text="${player.victories}"></span><br>
+                Золото: <span th:text="${player.resources.get('GOLD')}"></span>
+            </div>
+        </div>
+        <hr>
+        <div id="attack-controls" style="display: none;">
+            <h3>⚔️ Атака</h3>
+            <input type="number" id="troops" placeholder="Количество войск" min="1">
+            <button onclick="executeAttack()">Атаковать!</button>
+        </div>
+        <button onclick="refreshMap()">🔄 Обновить</button>
+    </div>
+</div>
+
+<script>
+    let selectedCell = null;
+    let mapData = null;
+
+    async function loadMap() {
+        const response = await fetch('/api/map');
+        mapData = await response.json();
+        renderMap();
+    }
+
+    function renderMap() {
+        const mapDiv = document.getElementById('map');
+        mapDiv.innerHTML = '';
+
+        for (let y = 0; y < 10; y++) {
+            for (let x = 0; x < 10; x++) {
+                const cell = mapData.cells.find(c => c.x === x && c.y === y);
+                if (!cell) continue;
+
+                const cellDiv = document.createElement('div');
+                cellDiv.className = 'cell';
+
+                if (cell.owner === null) {
+                    if (cell.terrain === 'WATER') cellDiv.classList.add('water');
+                    else cellDiv.classList.add('neutral');
+                } else {
+                    const players = Object.values(mapData.players);
+                    if (players[0] && cell.owner === players[0].id) cellDiv.classList.add('player1');
+                    else if (players[1] && cell.owner === players[1].id) cellDiv.classList.add('player2');
+                }
+
+                let terrainSymbol = '⬜';
+                if (cell.terrain === 'FOREST') terrainSymbol = '🌲';
+                else if (cell.terrain === 'MOUNTAIN') terrainSymbol = '⛰️';
+                else if (cell.terrain === 'CITY') terrainSymbol = '🏙️';
+                else if (cell.terrain === 'WATER') terrainSymbol = '💧';
+
+                cellDiv.innerHTML = `
+                    <div>${terrainSymbol}</div>
+                    <div class="troops">${cell.troops}</div>
+                `;
+
+                cellDiv.onclick = () => selectCell(cell, cellDiv);
+
+                if (selectedCell && selectedCell.x === x && selectedCell.y === y) {
+                    cellDiv.classList.add('selected');
+                }
+
+                mapDiv.appendChild(cellDiv);
+            }
+        }
+    }
+
+    function selectCell(cell, element) {
+        if (selectedCell) {
+            document.querySelectorAll('.cell').forEach(el => el.classList.remove('selected'));
+        }
+
+        selectedCell = cell;
+        element.classList.add('selected');
+
+        const infoDiv = document.getElementById('selected-info');
+        infoDiv.innerHTML = `
+            <strong>Клетка [${cell.x}, ${cell.y}]</strong><br>
+            Местность: ${cell.terrain}<br>
+            Войск: ${cell.troops}<br>
+            Владелец: ${cell.owner || 'нейтральная'}
+        `;
+
+        const attackControls = document.getElementById('attack-controls');
+        const players = Object.values(mapData.players);
+        const currentPlayer = players[0];
+
+        if (currentPlayer && cell.owner !== currentPlayer.id && !cell.water) {
+            attackControls.style.display = 'block';
+        } else {
+            attackControls.style.display = 'none';
+        }
+    }
+
+    async function executeAttack() {
+        if (!selectedCell) return;
+
+        const troops = document.getElementById('troops').value;
+        if (!troops || troops < 1) {
+            alert('Введите количество войск!');
+            return;
+        }
+
+        // Для простоты атакуем с первой клетки игрока
+        const players = Object.values(mapData.players);
+        const playerCells = mapData.cells.filter(c => c.owner === players[0].id);
+        if (playerCells.length === 0) {
+            alert('У вас нет клеток для атаки!');
+            return;
+        }
+
+        const fromCell = playerCells[0];
+
+        const response = await fetch('/api/attack', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fromX: fromCell.x,
+                fromY: fromCell.y,
+                toX: selectedCell.x,
+                toY: selectedCell.y,
+                troops: parseInt(troops)
+            })
+        });
+
+        const result = await response.json();
+        alert(result.message);
+        setTimeout(() => loadMap(), 1000);
+    }
+
+    function refreshMap() {
+        loadMap();
+    }
+
+    loadMap();
+    setInterval(loadMap, 3000);
+</script>
+</body>
+</html>
