@@ -13,6 +13,7 @@ public class Player {
     private final Set<String> capturedCellIds;
     private int totalTroops;
     private int victories;
+    private int population;
 
     public Player(String name) {
         this.id = UUID.randomUUID().toString();
@@ -27,6 +28,7 @@ public class Player {
 
         this.totalTroops = 0;
         this.victories = 0;
+        this.population = 50;    // Стартовое население
     }
 
     // Геттеры
@@ -36,6 +38,23 @@ public class Player {
     public Set<String> getCapturedCellIds() { return capturedCellIds; }
     public int getTotalTroops() { return totalTroops; }
     public int getVictories() { return victories; }
+    public int getPopulation() { return population; }
+
+    public int getResource(ResourceType type) {
+        return resources.getOrDefault(type, 0);
+    }
+
+    public void setPopulation(int population) {
+        this.population = population;
+    }
+
+    public void addPopulation(int amount) {
+        this.population += amount;
+    }
+
+    public void subtractPopulation(int amount) {
+        this.population = Math.max(0, this.population - amount);
+    }
 
     public void addResource(ResourceType type, int amount) {
         resources.put(type, resources.getOrDefault(type, 0) + amount);
@@ -50,6 +69,21 @@ public class Player {
         return false;
     }
 
+    public boolean hasEnoughResources(Map<ResourceType, Integer> required) {
+        for (Map.Entry<ResourceType, Integer> entry : required.entrySet()) {
+            if (getResource(entry.getKey()) < entry.getValue()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public void spendResources(Map<ResourceType, Integer> required) {
+        for (Map.Entry<ResourceType, Integer> entry : required.entrySet()) {
+            spendResource(entry.getKey(), entry.getValue());
+        }
+    }
+
     public void addCell(String cellId) {
         capturedCellIds.add(cellId);
     }
@@ -62,13 +96,39 @@ public class Player {
         totalTroops += amount;
     }
 
+    public void removeTroops(int amount) {
+        totalTroops = Math.max(0, totalTroops - amount);
+    }
+
     public void addVictory() {
         victories++;
     }
 
+    public int getTotalCells() {
+        return capturedCellIds.size();
+    }
+
+    public boolean isAlive() {
+        return !capturedCellIds.isEmpty();
+    }
+
+    public Map<String, Object> toMap() {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", id);
+        map.put("name", name);
+        map.put("cellsCount", capturedCellIds.size());
+        map.put("victories", victories);
+        map.put("totalTroops", totalTroops);
+        map.put("population", population);
+        map.put("gold", getResource(ResourceType.GOLD));
+        map.put("wood", getResource(ResourceType.WOOD));
+        map.put("food", getResource(ResourceType.FOOD));
+        return map;
+    }
+
     @Override
     public String toString() {
-        return String.format("Player{name='%s', cells=%d, gold=%d}",
-                name, capturedCellIds.size(), resources.getOrDefault(ResourceType.GOLD, 0));
+        return String.format("Player{name='%s', cells=%d, gold=%d, population=%d}",
+                name, capturedCellIds.size(), getResource(ResourceType.GOLD), population);
     }
 }

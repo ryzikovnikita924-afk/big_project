@@ -1,191 +1,817 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
+    <meta charset="UTF-8">
     <title>GeoStrat - Клеточная стратегия</title>
     <style>
-        body { font-family: Arial; margin: 20px; background: #1a1a2e; color: white; }
-        .game-container { display: flex; gap: 20px; }
+        * { box-sizing: border-box; user-select: none; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            margin: 0;
+            min-height: 100vh;
+            color: #eee;
+        }
+        .header {
+            background: #0f3460;
+            padding: 15px 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        h1 {
+            margin: 0;
+            font-size: 1.8em;
+            background: linear-gradient(45deg, #e94560, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .game-container {
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
         #map {
             display: grid;
-            grid-template-columns: repeat(10, 50px);
-            background: #16213e;
-            padding: 10px;
+            grid-template-columns: repeat(10, 65px);
+            background: #0f172a;
+            padding: 15px;
             border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
         .cell {
-            width: 50px;
-            height: 50px;
-            border: 1px solid #0f3460;
+            width: 65px;
+            height: 65px;
+            border: 1px solid #334155;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            transition: all 0.2s;
             font-size: 12px;
-            transition: 0.2s;
+            position: relative;
+            border-radius: 4px;
         }
-        .cell:hover { opacity: 0.8; transform: scale(0.95); }
-        .cell.selected { border: 3px solid yellow; background: #e94560; }
-        .player1 { background: #dc2626; }
-        .player2 { background: #3b82f6; }
-        .neutral { background: #475569; }
-        .water { background: #0ea5e9; }
-        .info-panel { background: #1e293b; padding: 20px; border-radius: 10px; min-width: 250px; }
-        button { background: #e94560; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; }
-        button:hover { background: #ff6b6b; }
-        select, input { padding: 5px; margin: 5px; }
-        .troops { font-weight: bold; color: #fbbf24; }
+        .cell:hover { transform: scale(0.95); filter: brightness(1.1); z-index: 1; }
+        .cell.selected { border: 3px solid #fbbf24; box-shadow: 0 0 10px #fbbf24; }
+        @keyframes attackFlash {
+            0% { background: #ff0000; transform: scale(1); }
+            50% { background: #ff6600; transform: scale(1.1); }
+            100% { background: inherit; transform: scale(1); }
+        }
+        @keyframes captureEffect {
+            0% { transform: scale(1); background: #ffd700; }
+            50% { transform: scale(1.2); background: #ffed4e; }
+            100% { transform: scale(1); background: inherit; }
+        }
+        .cell-attacking { animation: attackFlash 0.5s ease-in-out; }
+        .cell-captured { animation: captureEffect 0.6s ease-in-out; }
+        .toast-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #1e293b;
+            color: #fbbf24;
+            padding: 12px 20px;
+            border-radius: 8px;
+            border-left: 4px solid #e94560;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+            font-size: 14px;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .player1 { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
+        .player2 { background: linear-gradient(135deg, #1e3a5f, #2563eb); }
+        .neutral { background: linear-gradient(135deg, #334155, #475569); }
+        .water { background: linear-gradient(135deg, #0c4a6e, #0284c7); }
+        .terrain-icon { font-size: 22px; }
+        .troops {
+            font-weight: bold;
+            background: rgba(0,0,0,0.6);
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-top: 4px;
+            font-size: 11px;
+        }
+        .level {
+            position: absolute;
+            top: 2px;
+            right: 4px;
+            font-size: 10px;
+            background: rgba(0,0,0,0.5);
+            padding: 0px 3px;
+            border-radius: 5px;
+        }
+        .info-panel {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 10px;
+            min-width: 320px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .turn-panel {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #e94560;
+        }
+        .resources {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .resources div { margin: 5px 0; font-size: 14px; }
+        .player-card {
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .player-card:hover { background: #1e293b; transform: translateX(5px); }
+        button {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+            margin: 5px;
+        }
+        button:hover { background: #ff6b6b; transform: translateY(-2px); }
+        button:disabled { background: #475569; cursor: not-allowed; transform: none; }
+        .btn-primary { background: #10b981; }
+        .btn-primary:hover { background: #34d399; }
+        .btn-danger { background: #ef4444; }
+        select {
+            background: #0f172a;
+            color: white;
+            border: 1px solid #334155;
+            border-radius: 5px;
+            padding: 8px;
+            margin: 5px 0;
+            width: 100%;
+        }
+        select option { background: #1e293b; }
+        input {
+            padding: 8px;
+            margin: 5px 0;
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: white;
+            border-radius: 5px;
+            width: calc(100% - 10px);
+        }
+        .selected-info {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        .attack-controls {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 1px solid #e94560;
+        }
+        .status-badge {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .battle-log {
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .battle-log div { padding: 4px; border-bottom: 1px solid #334155; }
+        .player-selector {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .player-selector h3 { margin: 0 0 10px 0; font-size: 16px; }
+        .player-buttons { display: flex; gap: 10px; justify-content: center; }
+        .player-btn { background: #334155; padding: 8px 20px; }
+        .player-btn.active { background: #10b981; }
+        .debug-panel {
+            background: #0f172a;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-family: monospace;
+            display: none;
+        }
+        .debug-panel.show { display: block; }
+        .ai-panel {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border: 1px solid #8b5cf6;
+        }
+        .ai-panel h3 { margin: 0 0 10px 0; font-size: 16px; color: #a78bfa; }
+        .btn-ai { background: #8b5cf6; }
+        .btn-ai:hover { background: #a78bfa; }
+        .btn-ai.active { background: #10b981; }
+        .btn-ai.inactive { background: #ef4444; }
     </style>
 </head>
 <body>
-<h1>⚔️ GeoStrat - Клеточная стратегия</h1>
+<div class="header">
+    <h1>⚔️ GeoStrat — Клеточная стратегия</h1>
+    <div>🌍 Пошаговая стратегия | 🎮 PvP | 🤖 AI | 📊 Экономика</div>
+</div>
+
 <div class="game-container">
     <div id="map"></div>
+
     <div class="info-panel">
-        <h2>📊 Информация</h2>
-        <div id="selected-info">Выберите клетку</div>
-        <hr>
-        <h3>👥 Игроки</h3>
-        <div th:each="player : ${players}">
-            <div style="margin: 10px 0">
-                <strong th:text="${player.name}"></strong><br>
-                Клеток: <span th:text="${player.capturedCellIds.size()}"></span><br>
-                Побед: <span th:text="${player.victories}"></span><br>
-                Золото: <span th:text="${player.resources.get('GOLD')}"></span>
+        <div class="player-selector">
+            <h3>🎮 Выберите своего игрока:</h3>
+            <div class="player-buttons" id="player-buttons">
+                <button class="player-btn" onclick="selectPlayerByName('Красный Лорд')">👑 Красный Лорд</button>
+                <button class="player-btn" onclick="selectPlayerByName('Синий Барон')">🤖 Синий Барон</button>
             </div>
         </div>
-        <hr>
-        <div id="attack-controls" style="display: none;">
-            <h3>⚔️ Атака</h3>
-            <input type="number" id="troops" placeholder="Количество войск" min="1">
-            <button onclick="executeAttack()">Атаковать!</button>
+
+        <div class="turn-panel">
+            <h3>🎮 Управление ходом</h3>
+            <div>📊 Ход: <span id="turn-number">1</span></div>
+            <div>👑 Игрок: <span id="current-player">-</span></div>
+            <div id="turn-status" style="margin: 10px 0; font-weight: bold;">⏳ Загрузка...</div>
+            <div id="turn-controls">
+                <button id="start-turn-btn" onclick="startTurn()" class="btn-primary">🎯 Начать ход</button>
+                <button id="end-turn-btn" onclick="endTurn()" class="btn-danger" style="display: none;">✅ Завершить ход</button>
+            </div>
         </div>
-        <button onclick="refreshMap()">🔄 Обновить</button>
+
+        <div class="resources">
+            <h3>💰 Мои ресурсы</h3>
+            <div>🪙 Золото: <span id="gold">0</span></div>
+            <div>🌲 Дерево: <span id="wood">0</span></div>
+            <div>🍖 Еда: <span id="food">0</span></div>
+            <div>⚔️ Всего войск: <span id="total-troops">0</span></div>
+            <div>🏠 Клеток: <span id="my-cells">0</span></div>
+        </div>
+
+        <div class="selected-info" id="selected-info">
+            <div style="text-align: center;">👆 Нажмите на клетку</div>
+        </div>
+
+        <div id="attack-controls" style="display: none;">
+            <div class="attack-controls">
+                <h3 style="margin: 0 0 10px 0;">⚔️ Атака</h3>
+                <input type="number" id="troops-input" placeholder="Количество войск" min="1">
+                <button onclick="executeAttack()">🔥 Атаковать!</button>
+            </div>
+        </div>
+
+        <!-- AI Панель управления -->
+        <div class="ai-panel">
+            <h3>🤖 Управление AI</h3>
+            <select id="ai-tactic">
+                <option value="BALANCED">⚖️ Сбалансированная</option>
+                <option value="AGGRESSIVE">⚔️ Агрессивная</option>
+                <option value="DEFENSIVE">🛡️ Защитная</option>
+                <option value="ECONOMIC">💰 Экономическая</option>
+                <option value="RANDOM">🎲 Случайная</option>
+            </select>
+            <select id="ai-player">
+                <option value="">-- Выберите игрока для AI --</option>
+            </select>
+            <button onclick="setAITactic()" class="btn-ai" style="width: 48%;">🎯 Установить тактику</button>
+            <button onclick="setAIPlayer()" class="btn-ai" style="width: 48%;">🤖 Назначить AI</button>
+            <button onclick="toggleAI()" id="ai-toggle-btn" class="btn-ai active" style="width: 100%; margin-top: 5px;">🟢 AI Включен</button>
+        </div>
+
+        <h3>👥 Игроки</h3>
+        <div id="players-list">Загрузка...</div>
+
+        <div class="battle-log" id="battle-log">
+            <div style="color: #fbbf24;">📜 Лог боя</div>
+            <div>Игра началась!</div>
+        </div>
+
+        <button onclick="refreshMap()" style="width: 100%; margin-top: 15px;">🔄 Обновить</button>
+        <button onclick="toggleDebug()" style="width: 100%; margin-top: 5px; background: #475569;">🐛 Отладка</button>
+
+        <div id="debug-panel" class="debug-panel">
+            <strong>Debug Info:</strong><br>
+            <span id="debug-text">Waiting...</span>
+        </div>
     </div>
 </div>
 
 <script>
     let selectedCell = null;
     let mapData = null;
+    let gameState = {
+        isMyTurn: false,
+        currentPlayer: '',
+        turn: 1,
+        winner: null,
+        gameState: 'WAITING',
+        currentTurnPlayerId: null,
+        currentTurnPlayer: null
+    };
+    let myPlayerId = null;
+    let myPlayerName = null;
+    let aiEnabled = true;
+
+    function toggleDebug() {
+        document.getElementById('debug-panel').classList.toggle('show');
+    }
+
+    function logDebug(msg) {
+        console.log(msg);
+        document.getElementById('debug-text').innerHTML = new Date().toLocaleTimeString() + ': ' + msg;
+    }
+
+    function showNotification(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = 'toast-notification';
+        toast.style.borderLeftColor = type === 'success' ? '#10b981' : (type === 'error' ? '#ef4444' : '#e94560');
+        toast.innerHTML = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    function addBattleLog(message) {
+        const logDiv = document.getElementById('battle-log');
+        const entry = document.createElement('div');
+        entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logDiv.appendChild(entry);
+        logDiv.scrollTop = logDiv.scrollHeight;
+        while (logDiv.children.length > 20) logDiv.removeChild(logDiv.children[1]);
+    }
+
+    function animateAttack(cellElement, isWin = false) {
+        if (cellElement) {
+            cellElement.classList.add('cell-attacking');
+            if (isWin) setTimeout(() => cellElement.classList.add('cell-captured'), 250);
+            setTimeout(() => cellElement.classList.remove('cell-attacking', 'cell-captured'), 600);
+        }
+    }
+
+    // AI функции
+    async function loadPlayersForAI() {
+        try {
+            const response = await fetch('/api/players');
+            const players = await response.json();
+            const select = document.getElementById('ai-player');
+            select.innerHTML = '<option value="">-- Выберите игрока для AI --</option>';
+            players.forEach(player => {
+                select.innerHTML += `<option value="${player.name}">${player.name}</option>`;
+            });
+        } catch (e) {
+            console.error('Ошибка загрузки игроков для AI:', e);
+        }
+    }
+
+    async function setAITactic() {
+        const tactic = document.getElementById('ai-tactic').value;
+        try {
+            const response = await fetch('/api/ai/set-tactic', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({tactic: tactic})
+            });
+            const result = await response.json();
+            showNotification(result.message || `Тактика изменена на ${tactic}`, result.success ? 'success' : 'error');
+        } catch (e) {
+            showNotification('Ошибка установки тактики', 'error');
+        }
+    }
+
+    async function setAIPlayer() {
+        const playerName = document.getElementById('ai-player').value;
+        if (!playerName) {
+            showNotification('Выберите игрока!', 'error');
+            return;
+        }
+        try {
+            const response = await fetch('/api/ai/set-player', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({playerName: playerName})
+            });
+            const result = await response.json();
+            showNotification(result.message, result.success ? 'success' : 'error');
+        } catch (e) {
+            showNotification('Ошибка назначения AI', 'error');
+        }
+    }
+
+    async function toggleAI() {
+        aiEnabled = !aiEnabled;
+        try {
+            const response = await fetch('/api/ai/enable', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({enabled: aiEnabled})
+            });
+            const btn = document.getElementById('ai-toggle-btn');
+            if (aiEnabled) {
+                btn.innerHTML = '🟢 AI Включен';
+                btn.classList.remove('inactive');
+                btn.classList.add('active');
+            } else {
+                btn.innerHTML = '🔴 AI Выключен';
+                btn.classList.remove('active');
+                btn.classList.add('inactive');
+            }
+            showNotification(`AI ${aiEnabled ? 'включен' : 'выключен'}`, 'success');
+        } catch (e) {
+            showNotification('Ошибка переключения AI', 'error');
+        }
+    }
+
+    async function selectPlayerByName(playerName) {
+        try {
+            const response = await fetch('/api/players');
+            const players = await response.json();
+            const player = players.find(p => p.name === playerName);
+            if (player) {
+                const selectResponse = await fetch('/api/select-player', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({playerId: player.id})
+                });
+                const data = await selectResponse.json();
+                if (data.success) {
+                    myPlayerId = player.id;
+                    myPlayerName = player.name;
+                    showNotification(`✅ Выбран игрок: ${player.name}`, 'success');
+                    document.querySelectorAll('.player-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                        if (btn.innerText.includes(playerName)) btn.classList.add('active');
+                    });
+                    selectedCell = null;
+                    await loadMap();
+                    await checkGameState();
+                } else showNotification(data.message, 'error');
+            }
+        } catch (e) {
+            console.error('Ошибка выбора игрока:', e);
+        }
+    }
 
     async function loadMap() {
-        const response = await fetch('/api/map');
-        mapData = await response.json();
-        renderMap();
+        try {
+            const response = await fetch('/api/map');
+            const newMapData = await response.json();
+            if (mapData && mapData.cells) checkForChanges(mapData.cells, newMapData.cells);
+            mapData = newMapData;
+            if (!myPlayerId && mapData.players && mapData.players.length > 0) {
+                const defaultPlayer = mapData.players.find(p => p.name === 'Синий Барон') || mapData.players[0];
+                if (defaultPlayer) await selectPlayerByName(defaultPlayer.name);
+            }
+            renderMap();
+            updatePlayersList();
+            updateResources();
+        } catch (e) {
+            console.error('Ошибка загрузки карты:', e);
+        }
+    }
+
+    function checkForChanges(oldCells, newCells) {
+        for (let i = 0; i < newCells.length; i++) {
+            const newCell = newCells[i];
+            const oldCell = oldCells.find(c => c.x === newCell.x && c.y === newCell.y);
+            if (oldCell) {
+                if (oldCell.owner !== newCell.owner && newCell.owner === myPlayerId) {
+                    addBattleLog(`🎉 Захвачена клетка [${newCell.x},${newCell.y}]!`);
+                    showNotification(`🎉 Захвачена клетка [${newCell.x},${newCell.y}]!`, 'success');
+                    const cells = document.querySelectorAll('.cell');
+                    const index = newCell.y * 10 + newCell.x;
+                    if (cells[index]) animateAttack(cells[index], true);
+                } else if (Math.abs(oldCell.troops - newCell.troops) > 5 && oldCell.troops > newCell.troops) {
+                    addBattleLog(`⚔️ Битва на клетке [${newCell.x},${newCell.y}]: ${oldCell.troops} → ${newCell.troops} войск`);
+                    const cells = document.querySelectorAll('.cell');
+                    const index = newCell.y * 10 + newCell.x;
+                    if (cells[index]) animateAttack(cells[index], false);
+                }
+            }
+        }
     }
 
     function renderMap() {
         const mapDiv = document.getElementById('map');
+        if (!mapData) return;
         mapDiv.innerHTML = '';
-
         for (let y = 0; y < 10; y++) {
             for (let x = 0; x < 10; x++) {
                 const cell = mapData.cells.find(c => c.x === x && c.y === y);
                 if (!cell) continue;
-
                 const cellDiv = document.createElement('div');
                 cellDiv.className = 'cell';
-
-                if (cell.owner === null) {
-                    if (cell.terrain === 'WATER') cellDiv.classList.add('water');
-                    else cellDiv.classList.add('neutral');
-                } else {
-                    const players = Object.values(mapData.players);
-                    if (players[0] && cell.owner === players[0].id) cellDiv.classList.add('player1');
-                    else if (players[1] && cell.owner === players[1].id) cellDiv.classList.add('player2');
+                cellDiv.setAttribute('data-x', x);
+                cellDiv.setAttribute('data-y', y);
+                if (cell.water) cellDiv.classList.add('water');
+                else if (cell.owner === null) cellDiv.classList.add('neutral');
+                else if (cell.owner === myPlayerId) cellDiv.classList.add('player1');
+                else cellDiv.classList.add('player2');
+                let terrainIcon = '⬜';
+                switch(cell.terrain) {
+                    case 'FOREST': terrainIcon = '🌲'; break;
+                    case 'MOUNTAIN': terrainIcon = '⛰️'; break;
+                    case 'CITY': terrainIcon = '🏙️'; break;
+                    case 'WATER': terrainIcon = '💧'; break;
+                    default: terrainIcon = '🌾';
                 }
-
-                let terrainSymbol = '⬜';
-                if (cell.terrain === 'FOREST') terrainSymbol = '🌲';
-                else if (cell.terrain === 'MOUNTAIN') terrainSymbol = '⛰️';
-                else if (cell.terrain === 'CITY') terrainSymbol = '🏙️';
-                else if (cell.terrain === 'WATER') terrainSymbol = '💧';
-
-                cellDiv.innerHTML = `
-                    <div>${terrainSymbol}</div>
-                    <div class="troops">${cell.troops}</div>
-                `;
-
-                cellDiv.onclick = () => selectCell(cell, cellDiv);
-
-                if (selectedCell && selectedCell.x === x && selectedCell.y === y) {
-                    cellDiv.classList.add('selected');
-                }
-
+                cellDiv.innerHTML = `<div class="terrain-icon">${terrainIcon}</div><div class="troops">⚔️ ${cell.troops}</div><div class="level">⭐${cell.level || 1}</div>`;
+                cellDiv.onclick = () => selectCell(cell);
+                if (selectedCell && selectedCell.x === x && selectedCell.y === y) cellDiv.classList.add('selected');
                 mapDiv.appendChild(cellDiv);
             }
         }
     }
 
-    function selectCell(cell, element) {
-        if (selectedCell) {
-            document.querySelectorAll('.cell').forEach(el => el.classList.remove('selected'));
+    function selectCell(cell) {
+        logDebug(`selectCell: myTurn=${gameState.isMyTurn}, gameState=${gameState.gameState}`);
+
+        if (!gameState.isMyTurn) {
+            showNotification('Сейчас не ваш ход!', 'error');
+            return;
+        }
+
+        if (gameState.gameState !== 'PROCESSING') {
+            showNotification('Сначала нажмите "Начать ход"!', 'error');
+            return;
         }
 
         selectedCell = cell;
-        element.classList.add('selected');
+        renderMap();
 
-        const infoDiv = document.getElementById('selected-info');
-        infoDiv.innerHTML = `
-            <strong>Клетка [${cell.x}, ${cell.y}]</strong><br>
-            Местность: ${cell.terrain}<br>
-            Войск: ${cell.troops}<br>
-            Владелец: ${cell.owner || 'нейтральная'}
+        let ownerName = 'Нейтральная';
+        if (cell.owner) {
+            const owner = mapData.players.find(p => p.id === cell.owner);
+            if (owner) ownerName = owner.name;
+        }
+
+        let terrainName = 'Равнина';
+        switch(cell.terrain) {
+            case 'FOREST': terrainName = '🌲 Лес'; break;
+            case 'MOUNTAIN': terrainName = '⛰️ Горы'; break;
+            case 'CITY': terrainName = '🏙️ Город'; break;
+            case 'WATER': terrainName = '💧 Вода'; break;
+        }
+
+        document.getElementById('selected-info').innerHTML = `
+            <strong>📍 Клетка [${cell.x}, ${cell.y}]</strong><br><br>
+            🏔️ Местность: ${terrainName}<br>
+            ⭐ Уровень: ${cell.level || 1}<br>
+            ⚔️ Войск: ${cell.troops}<br>
+            👑 Владелец: ${ownerName}
         `;
 
         const attackControls = document.getElementById('attack-controls');
-        const players = Object.values(mapData.players);
-        const currentPlayer = players[0];
 
-        if (currentPlayer && cell.owner !== currentPlayer.id && !cell.water) {
+        if (cell.owner !== myPlayerId && !cell.water && gameState.isMyTurn && gameState.gameState === 'PROCESSING') {
             attackControls.style.display = 'block';
+            const myCells = mapData.cells.filter(c => c.owner === myPlayerId && !c.water);
+            if (myCells.length > 0) {
+                const maxTroops = Math.min(20, myCells[0].troops);
+                const troopsInput = document.getElementById('troops-input');
+                troopsInput.value = Math.min(maxTroops, Math.floor(cell.troops / 2) || 1);
+                troopsInput.max = maxTroops;
+                troopsInput.min = 1;
+            }
         } else {
             attackControls.style.display = 'none';
         }
     }
 
+    async function checkGameState() {
+        try {
+            const response = await fetch('/api/game-state');
+            const newState = await response.json();
+
+            const oldState = gameState.gameState;
+            gameState = newState;
+
+            logDebug(`State: ${oldState} -> ${gameState.gameState}, isMyTurn: ${gameState.isMyTurn}, turnOwner: ${gameState.currentTurnPlayer}`);
+
+            document.getElementById('turn-number').innerText = gameState.turn;
+            document.getElementById('current-player').innerText = gameState.currentTurnPlayer || '-';
+
+            if (gameState.winner) {
+                document.getElementById('turn-status').innerHTML = `🏆 ПОБЕДИТЕЛЬ: ${gameState.winner}! 🏆`;
+                document.getElementById('turn-status').style.color = '#fbbf24';
+                return;
+            }
+
+            const isMyTurnNow = gameState.currentTurnPlayerId === myPlayerId;
+            const isProcessing = gameState.gameState === 'PROCESSING';
+
+            if (isMyTurnNow && !isProcessing) {
+                document.getElementById('start-turn-btn').style.display = 'block';
+                document.getElementById('end-turn-btn').style.display = 'none';
+                document.getElementById('turn-status').innerHTML = '🎯 ВАШ ХОД! Нажмите "Начать ход"';
+                document.getElementById('turn-status').style.color = '#fbbf24';
+            } else if (isMyTurnNow && isProcessing) {
+                document.getElementById('start-turn-btn').style.display = 'none';
+                document.getElementById('end-turn-btn').style.display = 'block';
+                document.getElementById('turn-status').innerHTML = '🎲 ВАШ ХОД! Действуйте!';
+                document.getElementById('turn-status').style.color = '#10b981';
+            } else {
+                document.getElementById('start-turn-btn').style.display = 'block';
+                document.getElementById('end-turn-btn').style.display = 'none';
+                document.getElementById('turn-status').innerHTML = `⏳ Ожидание хода игрока: ${gameState.currentTurnPlayer || 'противника'}`;
+                document.getElementById('turn-status').style.color = '#fbbf24';
+            }
+
+            updateResources();
+        } catch (e) {
+            console.error('Ошибка проверки состояния:', e);
+        }
+    }
+
+    async function startTurn() {
+        if (!myPlayerId) {
+            showNotification('Сначала выберите игрока!', 'error');
+            return;
+        }
+
+        logDebug(`startTurn called for ${myPlayerName}`);
+
+        try {
+            const response = await fetch('/api/start-turn', { method: 'POST' });
+            const result = await response.json();
+
+            logDebug(`startTurn result: ${result.success}`);
+
+            if (result.success) {
+                showNotification('🎮 Ход начался!', 'success');
+                addBattleLog('🎮 Начат новый ход!');
+
+                gameState.gameState = 'PROCESSING';
+                gameState.isMyTurn = true;
+
+                document.getElementById('start-turn-btn').style.display = 'none';
+                document.getElementById('end-turn-btn').style.display = 'block';
+                document.getElementById('turn-status').innerHTML = '🎲 ВАШ ХОД! Действуйте!';
+                document.getElementById('turn-status').style.color = '#10b981';
+
+                await loadMap();
+                await checkGameState();
+            } else {
+                showNotification('❌ ' + result.message, 'error');
+            }
+        } catch (e) {
+            console.error('Ошибка начала хода:', e);
+            showNotification('Ошибка: ' + e.message, 'error');
+        }
+    }
+
+    async function endTurn() {
+        if (!myPlayerId) {
+            showNotification('Сначала выберите игрока!', 'error');
+            return;
+        }
+
+        logDebug(`endTurn called for ${myPlayerName}`);
+
+        try {
+            const response = await fetch('/api/end-turn', { method: 'POST' });
+            const result = await response.json();
+
+            logDebug(`endTurn result: ${result.success}`);
+
+            if (result.success) {
+                showNotification('✅ Ход завершен!', 'success');
+                selectedCell = null;
+                document.getElementById('attack-controls').style.display = 'none';
+                await checkGameState();
+                await loadMap();
+            } else {
+                showNotification('❌ ' + result.message, 'error');
+            }
+        } catch (e) {
+            console.error('Ошибка завершения хода:', e);
+            showNotification('Ошибка: ' + e.message, 'error');
+        }
+    }
+
     async function executeAttack() {
-        if (!selectedCell) return;
+        if (!selectedCell) {
+            showNotification('Выберите клетку для атаки!', 'error');
+            return;
+        }
 
-        const troops = document.getElementById('troops').value;
+        logDebug(`executeAttack: gameState=${gameState.gameState}`);
+
+        if (gameState.gameState !== 'PROCESSING') {
+            showNotification('Сначала начните ход кнопкой "Начать ход"!', 'error');
+            return;
+        }
+
+        const troops = document.getElementById('troops-input').value;
         if (!troops || troops < 1) {
-            alert('Введите количество войск!');
+            showNotification('Введите количество войск (не менее 1)', 'error');
             return;
         }
 
-        // Для простоты атакуем с первой клетки игрока
-        const players = Object.values(mapData.players);
-        const playerCells = mapData.cells.filter(c => c.owner === players[0].id);
-        if (playerCells.length === 0) {
-            alert('У вас нет клеток для атаки!');
+        const myCells = mapData.cells.filter(c => c.owner === myPlayerId && !c.water);
+        if (myCells.length === 0) {
+            showNotification('У вас нет клеток для атаки!', 'error');
             return;
         }
 
-        const fromCell = playerCells[0];
+        const targetElement = document.querySelector(`.cell[data-x='${selectedCell.x}'][data-y='${selectedCell.y}']`);
+        if (targetElement) animateAttack(targetElement, false);
 
-        const response = await fetch('/api/attack', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fromX: fromCell.x,
-                fromY: fromCell.y,
-                toX: selectedCell.x,
-                toY: selectedCell.y,
-                troops: parseInt(troops)
-            })
-        });
+        try {
+            const response = await fetch('/api/attack', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ toX: selectedCell.x, toY: selectedCell.y, troops: parseInt(troops) })
+            });
 
-        const result = await response.json();
-        alert(result.message);
-        setTimeout(() => loadMap(), 1000);
+            const result = await response.json();
+            logDebug(`Attack result: ${result.status}`);
+
+            if (result.status === 'ok') {
+                showNotification(result.message, 'success');
+                addBattleLog(`⚔️ Атака на клетку [${selectedCell.x},${selectedCell.y}] с ${troops} войсками!`);
+                await loadMap();
+            } else {
+                showNotification('❌ ' + result.message, 'error');
+            }
+        } catch (e) {
+            console.error('Attack error:', e);
+            showNotification('Ошибка: ' + e.message, 'error');
+        }
     }
 
-    function refreshMap() {
-        loadMap();
+    function updatePlayersList() {
+        if (!mapData || !mapData.players) return;
+        const playersDiv = document.getElementById('players-list');
+        if (mapData.players.length === 0) {
+            playersDiv.innerHTML = '<div style="text-align: center;">Нет игроков</div>';
+            return;
+        }
+        playersDiv.innerHTML = mapData.players.map(player => `
+            <div class="player-card" onclick="selectPlayerByName('${player.name}')">
+                <div style="font-weight: bold;">
+                    <span class="status-badge" style="background: ${player.id === myPlayerId ? '#10b981' : '#3b82f6'}"></span>
+                    ${player.name} ${player.id === myPlayerId ? '(Вы)' : ''}
+                </div>
+                <div>🏠 Клеток: ${player.cellsCount}</div>
+                <div>🏆 Побед: ${player.victories}</div>
+                <div>💰 Золото: ${player.gold || 0}</div>
+                <div>⚔️ Войска: ${player.totalTroops || 0}</div>
+            </div>
+        `).join('');
     }
 
-    loadMap();
-    setInterval(loadMap, 3000);
+    function updateResources() {
+        if (gameState) {
+            document.getElementById('gold').innerText = gameState.myGold || 0;
+            document.getElementById('wood').innerText = gameState.myWood || 0;
+            document.getElementById('food').innerText = gameState.myFood || 0;
+            document.getElementById('total-troops').innerText = gameState.myTroops || 0;
+            document.getElementById('my-cells').innerText = gameState.myCells || 0;
+        }
+    }
+
+    function refreshMap() { loadMap(); checkGameState(); }
+
+    async function init() {
+        await loadMap();
+        await checkGameState();
+        await loadPlayersForAI();
+        setInterval(() => checkGameState(), 3000);
+        setInterval(() => { if (!gameState.isMyTurn) loadMap(); }, 5000);
+        setInterval(() => loadPlayersForAI(), 10000);
+    }
+
+    init();
 </script>
 </body>
 </html>

@@ -11,6 +11,7 @@ public class Cell {
     private String ownerId;
     private int troopsCount;
     private int level;
+    private int productionRate;
     private long lastUpdatedAt;
 
     public Cell(int x, int y, TerrainType terrain) {
@@ -20,11 +21,23 @@ public class Cell {
         this.terrain = terrain;
         this.troopsCount = terrain == TerrainType.WATER ? 0 : 10;
         this.level = 1;
+        this.productionRate = calculateBaseProduction();
         this.lastUpdatedAt = System.currentTimeMillis();
     }
 
     private static String generateId(int x, int y) {
         return x + ":" + y;
+    }
+
+    private int calculateBaseProduction() {
+        if (isWater()) return 0;
+        switch (terrain) {
+            case CITY: return 30;
+            case FOREST: return 15;
+            case MOUNTAIN: return 10;
+            case PLAIN: return 12;
+            default: return 0;
+        }
     }
 
     // Геттеры и сеттеры
@@ -38,14 +51,52 @@ public class Cell {
     public void setTroopsCount(int troopsCount) { this.troopsCount = troopsCount; }
     public int getLevel() { return level; }
     public void setLevel(int level) { this.level = level; }
+    public int getProductionRate() { return productionRate; }
     public long getLastUpdatedAt() { return lastUpdatedAt; }
     public void setLastUpdatedAt(long lastUpdatedAt) { this.lastUpdatedAt = lastUpdatedAt; }
 
     public boolean isNeutral() { return ownerId == null; }
     public boolean isWater() { return terrain == TerrainType.WATER; }
 
+    // Текущее производство ресурсов (уровень влияет на производство)
+    public int getCurrentProduction() {
+        return productionRate * level;
+    }
+
+    // Улучшение клетки
+    public boolean upgrade() {
+        if (level >= 5) return false;
+        level++;
+        return true;
+    }
+
+    // Можно ли улучшить
+    public boolean canUpgrade() {
+        return level < 5;
+    }
+
+    // Стоимость следующего улучшения
+    public int getUpgradeCostGold() {
+        return 100 * level;
+    }
+
+    public int getUpgradeCostWood() {
+        return 50 * level;
+    }
+
     public int getDefenseBonus() {
-        return (int)(troopsCount * terrain.getDefenseBonus());
+        // Бонус защиты увеличивается с уровнем клетки
+        return (int)(troopsCount * terrain.getDefenseBonus() * (1 + level * 0.1));
+    }
+
+    // Пополнение войск
+    public void addTroops(int amount) {
+        this.troopsCount += amount;
+    }
+
+    // Урон при защите
+    public void takeDamage(int damage) {
+        this.troopsCount = Math.max(0, this.troopsCount - damage);
     }
 
     @Override
@@ -61,8 +112,7 @@ public class Cell {
 
     @Override
     public String toString() {
-        return String.format("Cell[%d,%d] owner=%s troops=%d terrain=%s",
-                x, y, ownerId != null ? ownerId : "neutral", troopsCount, terrain);
+        return String.format("Cell[%d,%d] owner=%s troops=%d level=%d terrain=%s",
+                x, y, ownerId != null ? ownerId : "neutral", troopsCount, level, terrain);
     }
 }
-
