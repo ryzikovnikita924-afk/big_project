@@ -1,4 +1,4 @@
-package com.example.engine;
+package com.example.service;
 
 import com.example.model.Player;
 import com.example.model.Cell;
@@ -34,6 +34,21 @@ public class TurnService {
         System.out.println("\n🎮 Игра началась! Первый ход: " + getCurrentPlayer().getName());
         System.out.println("Начальный статус: " + state);
         System.out.println("Начальный игрок ID: " + getCurrentPlayer().getId());
+    }
+
+    public void initializeFromSnapshot(List<Player> players, String currentPlayerId, int turnNumber, GameState gameState) {
+        this.players = new ArrayList<>(players);
+        this.turnNumber = turnNumber;
+        this.state = gameState;
+
+        for (int i = 0; i < this.players.size(); i++) {
+            if (this.players.get(i).getId().equals(currentPlayerId)) {
+                this.currentPlayerIndex = i;
+                break;
+            }
+        }
+
+        System.out.println("\n🎮 Игра загружена! Ход " + turnNumber + " - " + getCurrentPlayer().getName());
     }
 
     public synchronized boolean startTurn(String playerId) {
@@ -180,7 +195,6 @@ public class TurnService {
         return result;
     }
 
-    // НОВЫЙ МЕТОД canAttack
     public boolean canAttack(String playerId) {
         Player current = getCurrentPlayer();
         boolean result = current != null &&
@@ -193,6 +207,12 @@ public class TurnService {
     }
 
     public Player getWinner() { return winner; }
+
+    public void setWinner(Player winner) {
+        this.winner = winner;
+        this.state = GameState.FINISHED;
+    }
+
     public List<Player> getPlayers() {
         return players != null ? Collections.unmodifiableList(players) : Collections.emptyList();
     }

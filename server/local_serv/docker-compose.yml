@@ -1,5 +1,4 @@
 services:
-
   postgres:
     image: postgres:18-alpine
     container_name: geostrat-postgres
@@ -17,6 +16,89 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - geostrat-network
+    restart: unless-stopped
+
+
+  keycloak-postgres:
+    image: postgres:15-alpine
+    container_name: geostrat-keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak123}
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql/data
+    networks:
+      - geostrat-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak -d keycloak" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: geostrat-keycloak
+    command:
+      - start-dev
+      - --http-port=8080
+      - --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak123}
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 8081
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "8081:8080"
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    networks:
+      - geostrat-network
+    restart: unless-stopped
+
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:latest
+    container_name: geostrat-oauth-proxy
+    command:
+      - --provider=keycloak
+      - --client-id=${OAUTH2_CLIENT_ID:-geostrat-client}
+      - --client-secret=${OAUTH2_CLIENT_SECRET}
+      - --redirect-url=http://localhost/oauth2/callback
+      - --oidc-issuer-url=http://keycloak:8080/realms/${KEYCLOAK_REALM:-geostrat}
+      - --cookie-secret=${COOKIE_SECRET}
+      - --cookie-secure=false
+      - --http-address=0.0.0.0:4180
+      - --upstream=http://game-core:8080
+      - --email-domain=*
+      - --skip-provider-button=false
+      - --set-authorization-header=true
+      - --pass-user-headers=true
+      - --pass-access-token=true
+      - --pass-authorization-header=true
+      - --cookie-domain=localhost
+      - --whitelist-domain=localhost
+    environment:
+      OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_CLIENT_ID:-geostrat-client}
+      OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET}
+    ports:
+      - "4180:4180"
+    depends_on:
+      keycloak:
+        condition: service_started
+      game-core:
+        condition: service_healthy
     networks:
       - geostrat-network
     restart: unless-stopped
@@ -76,6 +158,7 @@ services:
     ports:
       - "80:80"
     depends_on:
+      - oauth2-proxy
       - game-core
     networks:
       - geostrat-network
@@ -87,4 +170,5 @@ networks:
 
 volumes:
   postgres_data:
+  keycloak_postgres_data:
   redis_data:

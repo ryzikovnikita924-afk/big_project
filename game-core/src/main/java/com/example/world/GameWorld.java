@@ -1,6 +1,6 @@
 package com.example.world;
 
-import com.example.engine.TurnService;
+import com.example.service.TurnService;
 import com.example.model.*;
 import com.example.engine.GameEngine;
 import org.springframework.stereotype.Component;
@@ -95,7 +95,6 @@ public class GameWorld {
         return turnService != null && turnService.isMyTurn(playerId);
     }
 
-    // НОВЫЙ МЕТОД canAttack
     public boolean canAttack(String playerId) {
         return turnService != null && turnService.canAttack(playerId);
     }
@@ -111,7 +110,19 @@ public class GameWorld {
     public Player getWinner() {
         return turnService != null ? turnService.getWinner() : null;
     }
+    public void clear() {
+        cells.clear();
+        players.clear();
+    }
 
+    public void addCell(Cell cell) {
+        cells.put(cell.getId(), cell);
+    }
+
+
+    public void addPlayerDirect(Player player) {
+        players.put(player.getId(), player);
+    }
     public void executeInstantAttack(String fromCellId, String toCellId, int troopsCount, String playerId) {
         Cell fromCell = cells.get(fromCellId);
         Cell toCell = cells.get(toCellId);
@@ -131,7 +142,6 @@ public class GameWorld {
             throw new IllegalStateException("Атака невозможна!");
         }
 
-        // ИСПРАВЛЕНО: используем canAttack вместо isMyTurn
         if (!canAttack(playerId)) {
             throw new IllegalStateException("Сейчас не ваш ход! Начните ход кнопкой 'Начать ход'.");
         }

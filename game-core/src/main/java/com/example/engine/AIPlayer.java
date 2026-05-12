@@ -3,6 +3,7 @@ package com.example.engine;
 import com.example.model.Cell;
 import com.example.model.Player;
 import com.example.model.ResourceType;
+import com.example.service.TurnService;
 import com.example.world.GameWorld;
 import org.springframework.stereotype.Component;
 

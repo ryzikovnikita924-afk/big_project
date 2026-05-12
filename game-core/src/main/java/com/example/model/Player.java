@@ -68,6 +68,19 @@ public class Player {
         }
         return false;
     }
+    public void setId(String id) {
+
+    }
+
+
+    public void setTotalTroops(int totalTroops) {
+        this.totalTroops = totalTroops;
+    }
+
+
+    public void setVictories(int victories) {
+        this.victories = victories;
+    }
 
     public boolean hasEnoughResources(Map<ResourceType, Integer> required) {
         for (Map.Entry<ResourceType, Integer> entry : required.entrySet()) {

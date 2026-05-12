@@ -1,7 +1,10 @@
 package com.example.Controller;
 
+import com.example.entity.PlayerEntity;
+import com.example.service.GamePersistenceService;
+import com.example.service.StatisticsService;
 import com.example.world.GameWorld;
-import com.example.engine.TurnService;
+import com.example.service.TurnService;
 import com.example.model.Player;
 import com.example.model.Cell;
 import com.example.model.ResourceType;
@@ -15,12 +18,22 @@ public class GameController {
 
     private final GameWorld gameWorld;
     private final TurnService turnService;
+    private final StatisticsService statisticsService;
+    private final GamePersistenceService gamePersistenceService;
     private String currentPlayerId;
     private List<Player> allPlayers;
+    private String currentGameId;
+    private Map<String, PlayerEntity> playerEntityMap = new HashMap<>();
 
-    public GameController(GameWorld gameWorld, TurnService turnService) {
+    public GameController(GameWorld gameWorld,
+                          TurnService turnService,
+                          StatisticsService statisticsService,
+                          GamePersistenceService gamePersistenceService) {
         this.gameWorld = gameWorld;
         this.turnService = turnService;
+        this.statisticsService = statisticsService;
+        this.gamePersistenceService = gamePersistenceService;
+        this.currentGameId = UUID.randomUUID().toString();
         initGame();
     }
 
@@ -40,8 +53,13 @@ public class GameController {
         allPlayers.add(player1);
         allPlayers.add(player2);
 
-        turnService.initialize(allPlayers);
 
+        for (Player player : allPlayers) {
+            PlayerEntity entity = statisticsService.getOrCreatePlayer(player.getId(), player.getName());
+            playerEntityMap.put(player.getId(), entity);
+        }
+
+        turnService.initialize(allPlayers);
 
         Player firstPlayer = player1;
         currentPlayerId = firstPlayer.getId();
@@ -145,7 +163,6 @@ public class GameController {
         }
 
         Player turnOwner = turnService.getCurrentPlayer();
-        System.out.println(turnOwner);
         if (turnOwner == null || !turnOwner.getId().equals(currentPlayerId)) {
             return Map.of("status", "error", "message",
                     "Сейчас не ваш ход! Сейчас ход игрока: " + (turnOwner != null ? turnOwner.getName() : "неизвестно"));
@@ -179,6 +196,8 @@ public class GameController {
 
         try {
             gameWorld.executeInstantAttack(fromCell.getId(), toId, request.troops, currentPlayerId);
+            // Автосохранение после атаки
+            gamePersistenceService.autoSave();
             return Map.of("status", "ok", "message", "⚔️ Атака выполнена!");
         } catch (Exception e) {
             return Map.of("status", "error", "message", e.getMessage());
@@ -196,7 +215,6 @@ public class GameController {
             return response;
         }
 
-        // Проверяем, что выбранный игрок - тот, чей сейчас ход
         Player turnOwner = turnService.getCurrentPlayer();
         if (turnOwner == null) {
             response.put("success", false);
@@ -232,6 +250,8 @@ public class GameController {
                 response.put("food", current.getResource(ResourceType.FOOD));
                 response.put("troops", current.getTotalTroops());
             }
+            // Автосохранение после начала хода
+            gamePersistenceService.autoSave();
         } else {
             response.put("message", "⏳ Не удалось начать ход. Попробуйте еще раз.");
         }
@@ -259,8 +279,6 @@ public class GameController {
         System.out.println("End turn success: " + success);
 
         if (success) {
-            // НЕ обновляем currentPlayerId автоматически!
-            // Пользователь сам решит, за кого играть дальше
             response.put("success", true);
             response.put("message", "✅ Ход завершен!");
 
@@ -268,6 +286,9 @@ public class GameController {
             response.put("nextPlayer", nextPlayer != null ? nextPlayer.getName() : null);
             response.put("nextPlayerId", nextPlayer != null ? nextPlayer.getId() : null);
             response.put("gameState", turnService.getState().toString());
+
+            // Автосохранение после завершения хода
+            gamePersistenceService.autoSave();
         } else {
             response.put("success", false);
             response.put("message", "❌ Не удалось завершить ход");
@@ -292,13 +313,11 @@ public class GameController {
         state.put("myPlayerId", currentPlayerId);
         state.put("myPlayerName", myPlayer != null ? myPlayer.getName() : null);
 
-        // ФЛАГ: можно ли НАЧАТЬ ход (статус WAITING и мой ход)
         boolean canStartTurn = currentPlayerId != null &&
                 turnOwner != null &&
                 currentPlayerId.equals(turnOwner.getId()) &&
                 turnService.getState() == TurnService.GameState.WAITING;
 
-        // ФЛАГ: можно ли АТАКОВАТЬ (статус PROCESSING и мой ход)
         boolean canAttack = currentPlayerId != null &&
                 turnOwner != null &&
                 currentPlayerId.equals(turnOwner.getId()) &&
@@ -325,6 +344,45 @@ public class GameController {
         return state;
     }
 
+    @PostMapping("/api/end-game")
+    @ResponseBody
+    public Map<String, Object> endGame() {
+        Player winner = gameWorld.getWinner();
+
+        // Сохраняем статистику для всех игроков
+        for (Player player : gameWorld.getPlayers().values()) {
+            PlayerEntity playerEntity = playerEntityMap.get(player.getId());
+            if (playerEntity == null) continue;
+
+            int cellsCaptured = player.getCapturedCellIds().size();
+            int troopsKilled = calculateTroopsKilled(player);
+            boolean isWinner = winner != null && winner.getId().equals(player.getId());
+            int turnsPlayed = turnService.getTurnNumber();
+            int score = cellsCaptured * 10 + troopsKilled + (isWinner ? 100 : 0);
+
+            // Обновляем статистику игрока
+            statisticsService.updatePlayerStats(playerEntity, cellsCaptured, troopsKilled, score, isWinner);
+            statisticsService.addGameHistory(
+                    currentGameId,
+                    playerEntity,
+                    getPlayerColor(player),
+                    isWinner,
+                    cellsCaptured,
+                    troopsKilled,
+                    turnsPlayed,
+                    getGameDuration()
+            );
+        }
+
+
+        gamePersistenceService.finishGame(winner);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("winner", winner != null ? winner.getName() : null);
+        return response;
+    }
+
     @GetMapping("/api/debug/status")
     @ResponseBody
     public Map<String, Object> debugStatus() {
@@ -340,6 +398,25 @@ public class GameController {
     private String getCurrentPlayerName() {
         Player player = gameWorld.getPlayer(currentPlayerId);
         return player != null ? player.getName() : "Не выбран";
+    }
+
+    private int calculateTroopsKilled(Player player) {
+        // TODO: реализовать подсчет убитых войск
+        return 0;
+    }
+
+    private String getPlayerColor(Player player) {
+        if (player.getName().equals("Красный Лорд")) {
+            return "RED";
+        } else if (player.getName().equals("Синий Барон")) {
+            return "BLUE";
+        }
+        return "NEUTRAL";
+    }
+
+    private int getGameDuration() {
+        // TODO: рассчитать длительность игры в минутах
+        return 0;
     }
 
     static class AttackRequest {

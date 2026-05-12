@@ -1,7 +1,7 @@
 package com.example.Controller;
 
 import com.example.engine.AIPlayer;
-import com.example.engine.TurnService;
+import com.example.service.TurnService;
 import com.example.world.GameWorld;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
