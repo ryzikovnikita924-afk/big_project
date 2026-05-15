@@ -216,6 +216,10 @@ public class TurnService {
     public List<Player> getPlayers() {
         return players != null ? Collections.unmodifiableList(players) : Collections.emptyList();
     }
+    public void updatePlayers(List<Player> newPlayers) {
+        this.players = new ArrayList<>(newPlayers);
+        System.out.println("📋 Список игроков обновлен: " + players.size() + " игроков");
+    }
 
     public boolean isGameFinished() {
         return state == GameState.FINISHED;

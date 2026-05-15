@@ -1,0 +1,56 @@
+{
+  "realm": "geostrat",
+  "enabled": true,
+  "displayName": "GeoStrat Game",
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "editUsernameAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "clients": [
+    {
+      "clientId": "geostrat-client",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${OAUTH2_CLIENT_SECRET}",
+      "redirectUris": [
+        "http://localhost/oauth2/callback",
+        "http://localhost:8080/*"
+      ],
+      "webOrigins": ["http://localhost:8080"],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true
+    }
+  ],
+  "users": [],
+  "authenticationFlows": [
+    {
+      "alias": "registration",
+      "description": "Registration flow",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "registration-page-form",
+          "requirement": "REQUIRED",
+          "priority": 10
+        },
+        {
+          "authenticator": "registration-user-creation",
+          "requirement": "REQUIRED",
+          "priority": 20
+        },
+        {
+          "authenticator": "registration-profile-action",
+          "requirement": "REQUIRED",
+          "priority": 30
+        }
+      ]
+    }
+  ]
+}
