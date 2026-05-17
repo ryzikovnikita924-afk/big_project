@@ -8,6 +8,7 @@ import com.example.service.TurnService;
 import com.example.model.Player;
 import com.example.model.Cell;
 import com.example.model.ResourceType;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
@@ -188,6 +189,18 @@ public class GameController {
         result.put("gameState", turnService.getState().toString());
 
         return result;
+    }
+    @GetMapping("/api/auth/check")
+    @ResponseBody
+    public Map<String, Object> checkAuth(HttpServletRequest request) {
+        String user = request.getHeader("X-Forwarded-User");
+        String email = request.getHeader("X-Forwarded-Email");
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("authenticated", user != null && !user.isEmpty());
+        response.put("username", user);
+        response.put("email", email);
+        return response;
     }
 
     @PostMapping("/api/attack")

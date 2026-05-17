@@ -55,9 +55,6 @@ services:
 
     ports:
       - "8081:8080"
-    depends_on:
-      keycloak-postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/realms/master"]
       interval: 10s
@@ -133,30 +130,39 @@ services:
     command:
       - --provider=keycloak
       - --http-address=0.0.0.0:4180
-      - --client-id=${OAUTH2_CLIENT_ID:-geostrat-client}
+      - --client-id=geostrat-client
       - --client-secret=${OAUTH2_CLIENT_SECRET}
       - --redirect-url=http://localhost/oauth2/callback
-      - --oidc-issuer-url=http://keycloak:8080/realms/geostrat
+      - --oidc-issuer-url=http://localhost:8081/realms/geostrat
+      - --login-url=http://localhost:8081/realms/geostrat/protocol/openid-connect/auth
+      - --redeem-url=http://localhost:8081/realms/geostrat/protocol/openid-connect/token
+      - --profile-url=http://localhost:8081/realms/geostrat/protocol/openid-connect/userinfo
+      - --validate-url=http://localhost:8081/realms/geostrat/protocol/openid-connect/userinfo
       - --scope=openid profile email
       - --email-domain=*
-      - --skip-provider-button=false
       - --upstream=http://game-core:8080
-      - --session-store-type=redis
-      - --redis-connection-url=redis://:${REDIS_PASSWORD}@redis:6379
-      - --pass-user-headers=true
-      - --pass-access-token=true
-      - --pass-authorization-header=true
-      - --set-authorization-header=true
-      - --cookie-name=_oauth2_proxy_geostrat
       - --cookie-secret=${COOKIE_SECRET}
       - --cookie-secure=false
-      - --cookie-httponly=true
-      - --cookie-samesite=lax
-      - --whitelist-domain=localhost
+      - --skip-auth-regex=^/$
+      - --skip-auth-regex=^/api/players$
+      - --skip-auth-regex=^/api/map$
+      - --skip-auth-regex=^/api/game-state$
+      - --skip-auth-regex=^/api/auth/check$
+      - --skip-auth-regex=^/api/user/leaderboard$
+      - --skip-auth-regex=^/index\.html$
+      - --skip-auth-regex=^/css/.*$
+      - --skip-auth-regex=^/js/.*$
+      - --insecure-oidc-skip-issuer-verification=true
+      - --skip-oidc-discovery=true
+      - --provider=keycloak-oidc
+      - --login-url=http://localhost:8081/realms/geostrat/protocol/openid-connect/auth
+      - --redeem-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/token
+      - --validate-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/userinfo
+      - --profile-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/userinfo
+      - --oidc-jwks-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/certs
     environment:
       OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET}
       COOKIE_SECRET: ${COOKIE_SECRET}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
     ports:
       - "4180:4180"
     depends_on:
@@ -166,6 +172,20 @@ services:
         condition: service_healthy
       game-core:
         condition: service_healthy
+    networks:
+      - geostrat-network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: geostrat-nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - oauth2-proxy
+      - game-core
     networks:
       - geostrat-network
     restart: unless-stopped

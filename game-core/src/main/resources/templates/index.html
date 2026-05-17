@@ -68,11 +68,17 @@
         .login-btn, .register-btn {
             background: #10b981;
             padding: 8px 20px;
+            cursor: pointer;
+            border: none;
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
         }
         .register-btn {
             background: #8b5cf6;
         }
         .register-btn:hover { background: #a78bfa; }
+        .login-btn:hover { background: #34d399; }
         .game-container {
             display: flex;
             padding: 20px;
@@ -302,12 +308,19 @@
         .rank-1 { color: #ffd700; }
         .rank-2 { color: #c0c0c0; }
         .rank-3 { color: #cd7f32; }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #94a3b8;
+        }
     </style>
 </head>
 <body>
 <div class="header">
     <h1>⚔️ GeoStrat — Клеточная стратегия</h1>
-    <div id="auth-container"></div>
+    <div id="auth-container">
+        <div class="loading">Загрузка...</div>
+    </div>
 </div>
 
 <div class="game-container" id="game-container" style="display: none;">
@@ -452,37 +465,42 @@
     // ========== АУТЕНТИФИКАЦИЯ ==========
     async function checkAuth() {
         try {
-            const response = await fetch('/api/user/me');
-            const user = await response.json();
+            // Проверяем аутентификацию через OAuth2-Proxy
+            const response = await fetch('/api/auth/check');
 
-            if (user.authenticated) {
-                isAuthenticated = true;
-                document.getElementById('auth-container').innerHTML = `
-                    <div class="user-info">
-                        <img class="user-avatar" src="${user.avatarUrl || '/default-avatar.png'}" alt="Avatar">
-                        <div class="user-details">
-                            <div class="user-name">${user.username || user.email}</div>
-                            <div class="user-stats">🏆 Побед: ${user.totalWins || 0} | 🎮 Игр: ${user.totalGames || 0}</div>
+            if (response.ok) {
+                const user = await response.json();
+                if (user.authenticated) {
+                    isAuthenticated = true;
+                    document.getElementById('auth-container').innerHTML = `
+                        <div class="user-info">
+                            <div class="user-details">
+                                <div class="user-name">${user.username || user.email || 'Игрок'}</div>
+                                <div class="user-stats">🏆 Побед: ${user.totalWins || 0} | 🎮 Игр: ${user.totalGames || 0}</div>
+                            </div>
+                            <button class="logout-btn" onclick="logout()">🚪 Выйти</button>
                         </div>
-                        <button class="logout-btn" onclick="logout()">🚪 Выйти</button>
-                    </div>
-                `;
-                document.getElementById('game-container').style.display = 'flex';
-                await initGame();
-                return true;
-            } else {
-                isAuthenticated = false;
-                document.getElementById('auth-container').innerHTML = `
-                    <div class="login-panel">
-                        <button class="login-btn" onclick="login()">🔐 Войти</button>
-                        <button class="register-btn" onclick="register()">📝 Зарегистрироваться</button>
-                    </div>
-                `;
-                document.getElementById('game-container').style.display = 'none';
-                return false;
+                    `;
+                    document.getElementById('game-container').style.display = 'flex';
+                    await initGame();
+                    return true;
+                }
             }
+
+            // Не авторизованы
+            isAuthenticated = false;
+            document.getElementById('auth-container').innerHTML = `
+                <div class="login-panel">
+                    <button class="login-btn" onclick="login()">🔐 Войти</button>
+                    <button class="register-btn" onclick="register()">📝 Зарегистрироваться</button>
+                </div>
+            `;
+            document.getElementById('game-container').style.display = 'none';
+            return false;
+
         } catch (e) {
             console.error('Error checking auth:', e);
+            isAuthenticated = false;
             document.getElementById('auth-container').innerHTML = `
                 <div class="login-panel">
                     <button class="login-btn" onclick="login()">🔐 Войти</button>
@@ -495,15 +513,15 @@
     }
 
     function login() {
-        window.location.href = '/oauth2/authorization/keycloak';
+        window.location.href = '/oauth2/sign_in';
     }
 
     function register() {
-        window.location.href = '/oauth2/authorization/keycloak';
+        window.location.href = '/oauth2/sign_in';
     }
 
     function logout() {
-        window.location.href = '/logout';
+        window.location.href = '/oauth2/sign_out?rd=http://localhost/';
     }
 
     // ========== ИГРОВЫЕ ФУНКЦИИ ==========
