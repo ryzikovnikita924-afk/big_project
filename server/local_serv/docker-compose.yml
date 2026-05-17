@@ -135,9 +135,9 @@ services:
       - --redirect-url=http://localhost/oauth2/callback
       - --oidc-issuer-url=http://localhost:8081/realms/geostrat
       - --login-url=http://localhost:8081/realms/geostrat/protocol/openid-connect/auth
-      - --redeem-url=http://localhost:8081/realms/geostrat/protocol/openid-connect/token
-      - --profile-url=http://localhost:8081/realms/geostrat/protocol/openid-connect/userinfo
-      - --validate-url=http://localhost:8081/realms/geostrat/protocol/openid-connect/userinfo
+      - --redeem-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/token
+      - --profile-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/userinfo
+      - --validate-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/userinfo
       - --scope=openid profile email
       - --email-domain=*
       - --upstream=http://game-core:8080
@@ -154,12 +154,6 @@ services:
       - --skip-auth-regex=^/js/.*$
       - --insecure-oidc-skip-issuer-verification=true
       - --skip-oidc-discovery=true
-      - --provider=keycloak-oidc
-      - --login-url=http://localhost:8081/realms/geostrat/protocol/openid-connect/auth
-      - --redeem-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/token
-      - --validate-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/userinfo
-      - --profile-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/userinfo
-      - --oidc-jwks-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/certs
     environment:
       OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET}
       COOKIE_SECRET: ${COOKIE_SECRET}
@@ -198,6 +192,10 @@ volumes:
   postgres_data:
   keycloak_postgres_data:
   redis_data:
+
+
+
+
 
 
 
