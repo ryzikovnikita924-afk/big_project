@@ -32,38 +32,40 @@ services:
       - geostrat-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
-      interval: 15s
+      interval: 10s
       timeout: 10s
       retries: 10
-      start_period: 30s
     restart: unless-stopped
 
   keycloak:
     image: quay.io/keycloak/keycloak:23.0
     container_name: geostrat-keycloak
-    command: start-dev --http-port=8080
+    command:
+
+      - start-dev
+      - --http-port=8080
+      - --hostname-strict=false
+      - --hostname-strict-https=false
     environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak123}
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_FEATURES: preview
-      KC_HOSTNAME_STRICT: "false"
-      KC_PROXY: edge
-
     ports:
       - "8081:8080"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/realms/master"]
-      interval: 10s
-      timeout: 10s
-      retries: 10
-      start_period: 40s
     networks:
       - geostrat-network
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   redis:
     image: redis:7-alpine
@@ -97,14 +99,18 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis123}
+
+      # ---- KEYCLOAK ----
       SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/geostrat
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_ID: ${OAUTH2_CLIENT_ID:-geostrat-client}
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_ID: geostrat-client
       SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET}
-      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET}
-      SERVER_PORT: 8080
+
       SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/geostrat/protocol/openid-connect/token
       SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/geostrat/protocol/openid-connect/certs
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/geostrat/protocol/openid-connect/certs
+
+      SERVER_PORT: 8080
+
     ports:
       - "8080:8080"
     depends_on:
@@ -122,80 +128,27 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
 
   oauth2-proxy:
-    image: quay.io/oauth2-proxy/oauth2-proxy:latest
-    container_name: geostrat-oauth-proxy
-    command:
-      - --provider=keycloak
-      - --http-address=0.0.0.0:4180
-      - --client-id=geostrat-client
-      - --client-secret=${OAUTH2_CLIENT_SECRET}
-      - --redirect-url=http://localhost/oauth2/callback
-      - --oidc-issuer-url=http://localhost:8081/realms/geostrat
-      - --login-url=http://localhost:8081/realms/geostrat/protocol/openid-connect/auth
-      - --redeem-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/token
-      - --profile-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/userinfo
-      - --validate-url=http://keycloak:8080/realms/geostrat/protocol/openid-connect/userinfo
-      - --scope=openid profile email
-      - --email-domain=*
-      - --upstream=http://game-core:8080
-      - --cookie-secret=${COOKIE_SECRET}
-      - --cookie-secure=false
-      - --skip-auth-regex=^/$
-      - --skip-auth-regex=^/api/players$
-      - --skip-auth-regex=^/api/map$
-      - --skip-auth-regex=^/api/game-state$
-      - --skip-auth-regex=^/api/auth/check$
-      - --skip-auth-regex=^/api/user/leaderboard$
-      - --skip-auth-regex=^/index\.html$
-      - --skip-auth-regex=^/css/.*$
-      - --skip-auth-regex=^/js/.*$
-      - --insecure-oidc-skip-issuer-verification=true
-      - --skip-oidc-discovery=true
-    environment:
-      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET}
-      COOKIE_SECRET: ${COOKIE_SECRET}
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.2
     ports:
       - "4180:4180"
-    depends_on:
-      keycloak:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      game-core:
-        condition: service_healthy
-    networks:
-      - geostrat-network
-    restart: unless-stopped
-
-  nginx:
-    image: nginx:alpine
-    container_name: geostrat-nginx
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    ports:
-      - "80:80"
-    depends_on:
-      - oauth2-proxy
-      - game-core
+      - ./oauth2-proxy.toml:/etc/oauth2-proxy/oauth2-proxy.toml:ro
+    command:
+      - --config=/etc/oauth2-proxy/oauth2-proxy.toml
+    restart: no
     networks:
-      - geostrat-network
-    restart: unless-stopped
+      geostrat-network:
 
 networks:
   geostrat-network:
     driver: bridge
+    name: local_serv_geostrat-network
 
 volumes:
   postgres_data:
   keycloak_postgres_data:
   redis_data:
-
-
-
-
-
-
-

@@ -1,98 +1,13 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GeoStrat - Клеточная стратегия</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css"/>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css"/>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
-        * { box-sizing: border-box; user-select: none; }
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            margin: 0;
-            min-height: 100vh;
-            color: #eee;
-        }
-        .header {
-            background: #0f3460;
-            padding: 15px 30px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        h1 {
-            margin: 0;
-            font-size: 1.8em;
-            background: linear-gradient(45deg, #e94560, #ff6b6b);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            background: #1e293b;
-            padding: 8px 20px;
-            border-radius: 40px;
-        }
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-        .user-details {
-            font-size: 14px;
-        }
-        .user-name {
-            font-weight: bold;
-            color: #10b981;
-        }
-        .user-stats {
-            font-size: 12px;
-            color: #94a3b8;
-        }
-        .logout-btn {
-            background: #ef4444;
-            padding: 5px 15px;
-            font-size: 12px;
-            margin: 0;
-        }
-        .logout-btn:hover { background: #dc2626; }
-        .login-panel {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        .login-btn, .register-btn {
-            background: #10b981;
-            padding: 8px 20px;
-            cursor: pointer;
-            border: none;
-            color: white;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        .register-btn {
-            background: #8b5cf6;
-        }
-        .register-btn:hover { background: #a78bfa; }
-        .login-btn:hover { background: #34d399; }
-        .game-container {
-            display: flex;
-            padding: 20px;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        #map {
-            display: grid;
-            grid-template-columns: repeat(10, 65px);
-            background: #0f172a;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
         .cell {
             width: 65px;
             height: 65px;
@@ -104,905 +19,387 @@
             cursor: pointer;
             transition: all 0.2s;
             font-size: 12px;
-            position: relative;
             border-radius: 4px;
         }
-        .cell:hover { transform: scale(0.95); filter: brightness(1.1); z-index: 1; }
+        .cell:hover { transform: scale(0.95); filter: brightness(1.1); }
         .cell.selected { border: 3px solid #fbbf24; box-shadow: 0 0 10px #fbbf24; }
-        @keyframes attackFlash {
-            0% { background: #ff0000; transform: scale(1); }
-            50% { background: #ff6600; transform: scale(1.1); }
-            100% { background: inherit; transform: scale(1); }
-        }
-        @keyframes captureEffect {
-            0% { transform: scale(1); background: #ffd700; }
-            50% { transform: scale(1.2); background: #ffed4e; }
-            100% { transform: scale(1); background: inherit; }
-        }
-        .cell-attacking { animation: attackFlash 0.5s ease-in-out; }
-        .cell-captured { animation: captureEffect 0.6s ease-in-out; }
-        .toast-notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #1e293b;
-            color: #fbbf24;
-            padding: 12px 20px;
-            border-radius: 8px;
-            border-left: 4px solid #e94560;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 1000;
-            animation: slideIn 0.3s ease-out;
-            font-size: 14px;
-        }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
         .player1 { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
         .player2 { background: linear-gradient(135deg, #1e3a5f, #2563eb); }
         .neutral { background: linear-gradient(135deg, #334155, #475569); }
         .water { background: linear-gradient(135deg, #0c4a6e, #0284c7); }
-        .terrain-icon { font-size: 22px; }
+        #map {
+            display: grid;
+            grid-template-columns: repeat(10, 65px);
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 10px;
+        }
         .troops {
             font-weight: bold;
             background: rgba(0,0,0,0.6);
             padding: 2px 6px;
             border-radius: 10px;
             margin-top: 4px;
-            font-size: 11px;
         }
-        .level {
-            position: absolute;
-            top: 2px;
-            right: 4px;
-            font-size: 10px;
-            background: rgba(0,0,0,0.5);
-            padding: 0px 3px;
-            border-radius: 5px;
-        }
-        .info-panel {
-            background: #1e293b;
-            padding: 20px;
-            border-radius: 10px;
-            min-width: 320px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        .turn-panel {
-            background: #0f172a;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #e94560;
-        }
-        .resources {
-            background: #0f172a;
-            padding: 12px;
-            border-radius: 8px;
-            margin: 15px 0;
-        }
-        .resources div { margin: 5px 0; font-size: 14px; }
-        .player-card {
-            background: #0f172a;
-            padding: 10px;
-            border-radius: 8px;
-            margin: 10px 0;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .player-card:hover { background: #1e293b; transform: translateX(5px); }
-        button {
-            background: #e94560;
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            cursor: pointer;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.2s;
-            margin: 5px;
-        }
-        button:hover { background: #ff6b6b; transform: translateY(-2px); }
-        button:disabled { background: #475569; cursor: not-allowed; transform: none; }
-        .btn-primary { background: #10b981; }
-        .btn-primary:hover { background: #34d399; }
-        .btn-danger { background: #ef4444; }
-        select {
-            background: #0f172a;
-            color: white;
-            border: 1px solid #334155;
-            border-radius: 5px;
-            padding: 8px;
-            margin: 5px 0;
-            width: 100%;
-        }
-        select option { background: #1e293b; }
-        input {
-            padding: 8px;
-            margin: 5px 0;
-            background: #0f172a;
-            border: 1px solid #334155;
-            color: white;
-            border-radius: 5px;
-            width: calc(100% - 10px);
-        }
-        .selected-info {
-            background: #0f172a;
-            padding: 12px;
-            border-radius: 8px;
-            margin: 15px 0;
-            font-size: 14px;
-        }
-        .attack-controls {
-            background: #0f172a;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            border: 1px solid #e94560;
-        }
-        .status-badge {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-        .battle-log {
-            background: #0f172a;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 15px;
-            max-height: 150px;
-            overflow-y: auto;
-            font-size: 12px;
-        }
-        .battle-log div { padding: 4px; border-bottom: 1px solid #334155; }
-        .player-selector {
-            background: #0f172a;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .player-selector h3 { margin: 0 0 10px 0; font-size: 16px; }
-        .player-buttons { display: flex; gap: 10px; justify-content: center; }
-        .player-btn { background: #334155; padding: 8px 20px; }
-        .player-btn.active { background: #10b981; }
-        .debug-panel {
-            background: #0f172a;
-            padding: 10px;
-            margin-top: 10px;
-            border-radius: 8px;
-            font-size: 11px;
-            font-family: monospace;
-            display: none;
-        }
-        .debug-panel.show { display: block; }
-        .ai-panel {
-            background: #0f172a;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 15px;
-            border: 1px solid #8b5cf6;
-        }
-        .ai-panel h3 { margin: 0 0 10px 0; font-size: 16px; color: #a78bfa; }
-        .btn-ai { background: #8b5cf6; }
-        .btn-ai:hover { background: #a78bfa; }
-        .btn-ai.active { background: #10b981; }
-        .btn-ai.inactive { background: #ef4444; }
-        .leaderboard-panel {
-            background: #0f172a;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 15px;
-            border: 1px solid #fbbf24;
-        }
-        .leaderboard-panel h3 { margin: 0 0 10px 0; font-size: 16px; color: #fbbf24; }
-        .leaderboard-entry {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-            font-size: 12px;
-            border-bottom: 1px solid #334155;
-        }
-        .rank-1 { color: #ffd700; }
-        .rank-2 { color: #c0c0c0; }
-        .rank-3 { color: #cd7f32; }
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #94a3b8;
-        }
+        .terrain-icon { font-size: 22px; }
     </style>
+    <script src="/js/auth.js" defer></script>
+    <script src="/js/game.js" defer></script>
 </head>
-<body>
-<div class="header">
-    <h1>⚔️ GeoStrat — Клеточная стратегия</h1>
-    <div id="auth-container">
-        <div class="loading">Загрузка...</div>
-    </div>
-</div>
+<body class="min-h-screen bg-base-200">
+<div class="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-6">
+    <header class="hero rounded-box bg-base-100 shadow-sm">
+        <div class="hero-content w-full flex-col items-start gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <p class="text-sm uppercase tracking-[0.3em] text-primary">GeoStrat</p>
+                <h1 class="text-4xl font-black">Клеточная стратегия</h1>
+                <p class="max-w-2xl text-base-content/70">
+                    Пошаговая стратегия | PvP | Экономика
+                </p>
+            </div>
+            <div class="flex flex-col items-start gap-3 sm:items-end">
+                <div id="auth-state" class="badge badge-neutral badge-lg">Проверяем сессию...</div>
+                <div class="flex gap-3">
+                    <a class="btn btn-outline btn-primary" href="/login">🔐 Войти через Keycloak</a>
+                    <button id="logout-button" class="btn btn-neutral hidden" type="button">🚪 Выйти</button>
+                </div>
+            </div>
+        </div>
+    </header>
 
-<div class="game-container" id="game-container" style="display: none;">
-    <div id="map"></div>
-
-    <div class="info-panel">
-        <div class="player-selector">
-            <h3>🎮 Выберите своего игрока:</h3>
-            <div class="player-buttons" id="player-buttons">
-                <button class="player-btn" onclick="selectPlayerByName('Красный Лорд')">👑 Красный Лорд</button>
-                <button class="player-btn" onclick="selectPlayerByName('Синий Барон')">🤖 Синий Барон</button>
+    <div class="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+        <!-- Игровая карта -->
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title">Игровая карта</h2>
+                <div id="map" class="flex justify-center"></div>
             </div>
         </div>
 
-        <div class="turn-panel">
-            <h3>🎮 Управление ходом</h3>
-            <div>📊 Ход: <span id="turn-number">1</span></div>
-            <div>👑 Игрок: <span id="current-player">-</span></div>
-            <div id="turn-status" style="margin: 10px 0; font-weight: bold;">⏳ Загрузка...</div>
-            <div id="turn-controls">
-                <button id="start-turn-btn" onclick="startTurn()" class="btn-primary">🎯 Начать ход</button>
-                <button id="end-turn-btn" onclick="endTurn()" class="btn-danger" style="display: none;">✅ Завершить ход</button>
+        <!-- Информационная панель -->
+        <div class="space-y-4">
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title">🎮 Управление ходом</h2>
+                    <div class="flex justify-between">
+                        <span>📊 Ход: <span id="turn-number">1</span></span>
+                        <span>👑 Игрок: <span id="current-player">-</span></span>
+                    </div>
+                    <div id="turn-status" class="text-center font-bold">⏳ Загрузка...</div>
+                    <div class="flex gap-2">
+                        <button id="start-turn-btn" class="btn btn-primary flex-1 hidden">🎯 Начать ход</button>
+                        <button id="end-turn-btn" class="btn btn-secondary flex-1 hidden">✅ Завершить ход</button>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="resources">
-            <h3>💰 Мои ресурсы</h3>
-            <div>🪙 Золото: <span id="gold">0</span></div>
-            <div>🌲 Дерево: <span id="wood">0</span></div>
-            <div>🍖 Еда: <span id="food">0</span></div>
-            <div>⚔️ Всего войск: <span id="total-troops">0</span></div>
-            <div>🏠 Клеток: <span id="my-cells">0</span></div>
-        </div>
-
-        <div class="selected-info" id="selected-info">
-            <div style="text-align: center;">👆 Нажмите на клетку</div>
-        </div>
-
-        <div id="attack-controls" style="display: none;">
-            <div class="attack-controls">
-                <h3 style="margin: 0 0 10px 0;">⚔️ Атака</h3>
-                <input type="number" id="troops-input" placeholder="Количество войск" min="1">
-                <button onclick="executeAttack()">🔥 Атаковать!</button>
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title">💰 Мои ресурсы</h2>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>🪙 Золото: <span id="gold">0</span></div>
+                        <div>🌲 Дерево: <span id="wood">0</span></div>
+                        <div>🍖 Еда: <span id="food">0</span></div>
+                        <div>⚔️ Войска: <span id="total-troops">0</span></div>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="ai-panel">
-            <h3>🤖 Управление AI</h3>
-            <select id="ai-tactic">
-                <option value="BALANCED">⚖️ Сбалансированная</option>
-                <option value="AGGRESSIVE">⚔️ Агрессивная</option>
-                <option value="DEFENSIVE">🛡️ Защитная</option>
-                <option value="ECONOMIC">💰 Экономическая</option>
-                <option value="RANDOM">🎲 Случайная</option>
-            </select>
-            <select id="ai-player">
-                <option value="">-- Выберите игрока для AI --</option>
-            </select>
-            <button onclick="setAITactic()" class="btn-ai" style="width: 48%;">🎯 Установить тактику</button>
-            <button onclick="setAIPlayer()" class="btn-ai" style="width: 48%;">🤖 Назначить AI</button>
-            <button onclick="toggleAI()" id="ai-toggle-btn" class="btn-ai active" style="width: 100%; margin-top: 5px;">🟢 AI Включен</button>
-        </div>
+            <div id="attack-panel" class="card bg-base-100 shadow-sm hidden">
+                <div class="card-body">
+                    <h2 class="card-title">⚔️ Атака</h2>
+                    <input type="number" id="troops-input" class="input input-bordered" placeholder="Количество войск" min="1">
+                    <button id="attack-btn" class="btn btn-error">🔥 Атаковать!</button>
+                </div>
+            </div>
 
-        <div class="leaderboard-panel">
-            <h3>🏆 Таблица лидеров</h3>
-            <div id="leaderboard-list">Загрузка...</div>
-        </div>
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title">🏆 Таблица лидеров</h2>
+                    <div id="leaderboard-list" class="space-y-1 text-sm"></div>
+                </div>
+            </div>
 
-        <h3>👥 Игроки</h3>
-        <div id="players-list">Загрузка...</div>
-
-        <div class="battle-log" id="battle-log">
-            <div style="color: #fbbf24;">📜 Лог боя</div>
-            <div>Игра началась!</div>
-        </div>
-
-        <button onclick="saveGame()" style="width: 48%; background: #8b5cf6;">💾 Сохранить игру</button>
-        <button onclick="loadGame()" style="width: 48%;">📂 Загрузить игру</button>
-        <button onclick="refreshMap()" style="width: 100%; margin-top: 5px;">🔄 Обновить</button>
-        <button onclick="toggleDebug()" style="width: 100%; margin-top: 5px; background: #475569;">🐛 Отладка</button>
-
-        <div id="debug-panel" class="debug-panel">
-            <strong>Debug Info:</strong><br>
-            <span id="debug-text">Waiting...</span>
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title">📜 Лог боя</h2>
+                    <div id="battle-log" class="h-32 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-    let selectedCell = null;
-    let mapData = null;
-    let gameState = {
-        canStartTurn: false,
-        canAttack: false,
-        gameState: 'WAITING',
-        currentTurnPlayer: null,
-        currentTurnPlayerId: null,
-        turn: 1,
-        myPlayerId: null,
-        myPlayerName: null
-    };
-    let myPlayerId = null;
-    let myPlayerName = null;
-    let aiEnabled = true;
-    let isAuthenticated = false;
+    document.addEventListener("DOMContentLoaded", async () => {
+        const AuthApi = window.AuthApi;
+        const GameApi = window.GameApi;
 
-    function toggleDebug() {
-        document.getElementById('debug-panel').classList.toggle('show');
-    }
+        const authStateBadge = document.getElementById("auth-state");
+        const logoutButton = document.getElementById("logout-button");
+        const startTurnBtn = document.getElementById("start-turn-btn");
+        const endTurnBtn = document.getElementById("end-turn-btn");
+        const attackPanel = document.getElementById("attack-panel");
+        const attackBtn = document.getElementById("attack-btn");
+        const troopsInput = document.getElementById("troops-input");
 
-    function logDebug(msg) {
-        console.log(msg);
-        document.getElementById('debug-text').innerHTML = new Date().toLocaleTimeString() + ': ' + msg;
-    }
+        let selectedCell = null;
+        let mapData = null;
+        let myPlayerId = null;
+        let myPlayerName = null;
+        let gameState = {
+            canStartTurn: false,
+            canAttack: false,
+            gameState: 'WAITING',
+            currentTurnPlayer: null,
+            turn: 1
+        };
 
-    function showNotification(message, type = 'info') {
-        const toast = document.createElement('div');
-        toast.className = 'toast-notification';
-        toast.style.borderLeftColor = type === 'success' ? '#10b981' : (type === 'error' ? '#ef4444' : '#e94560');
-        toast.innerHTML = message;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
-    }
+        async function refreshAuthState() {
+            const {status, body} = await AuthApi.getCurrentUser();
+            const userInfo = body?.data?.userInfo ?? {};
+            const authenticated = status === 200 && body?.data?.authenticated;
 
-    function addBattleLog(message) {
-        const logDiv = document.getElementById('battle-log');
-        const entry = document.createElement('div');
-        entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
-        logDiv.appendChild(entry);
-        logDiv.scrollTop = logDiv.scrollHeight;
-        while (logDiv.children.length > 20) logDiv.removeChild(logDiv.children[1]);
-    }
+            authStateBadge.className = authenticated
+                ? "badge badge-success badge-lg"
+                : "badge badge-warning badge-lg";
+            authStateBadge.textContent = authenticated
+                ? `Вы вошли как ${AuthApi.extractDisplayName(userInfo)}`
+                : "Гостевой режим";
 
-    function animateAttack(cellElement, isWin = false) {
-        if (cellElement) {
-            cellElement.classList.add('cell-attacking');
-            if (isWin) setTimeout(() => cellElement.classList.add('cell-captured'), 250);
-            setTimeout(() => cellElement.classList.remove('cell-attacking', 'cell-captured'), 600);
+            logoutButton.classList.toggle("hidden", !authenticated);
+
+            if (authenticated) {
+                await loadMap();
+                await checkGameState();
+            }
         }
-    }
 
-    // ========== АУТЕНТИФИКАЦИЯ ==========
-    async function checkAuth() {
-        try {
-            // Проверяем аутентификацию через OAuth2-Proxy
-            const response = await fetch('/api/auth/check');
+        async function loadMap() {
+            const {body} = await GameApi.getMap();
+            if (body) {
+                mapData = body;
+                if (!myPlayerId && mapData.players?.length > 0) {
+                    myPlayerId = mapData.players[0]?.id;
+                    myPlayerName = mapData.players[0]?.name;
+                }
+                renderMap();
+                updatePlayersList();
+            }
+        }
 
-            if (response.ok) {
-                const user = await response.json();
-                if (user.authenticated) {
-                    isAuthenticated = true;
-                    document.getElementById('auth-container').innerHTML = `
-                        <div class="user-info">
-                            <div class="user-details">
-                                <div class="user-name">${user.username || user.email || 'Игрок'}</div>
-                                <div class="user-stats">🏆 Побед: ${user.totalWins || 0} | 🎮 Игр: ${user.totalGames || 0}</div>
-                            </div>
-                            <button class="logout-btn" onclick="logout()">🚪 Выйти</button>
-                        </div>
+        function renderMap() {
+            const mapDiv = document.getElementById('map');
+            if (!mapData) return;
+
+            mapDiv.innerHTML = '';
+            for (let y = 0; y < 10; y++) {
+                for (let x = 0; x < 10; x++) {
+                    const cell = mapData.cells?.find(c => c.x === x && c.y === y);
+                    if (!cell) continue;
+
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell';
+                    cellDiv.setAttribute('data-x', x);
+                    cellDiv.setAttribute('data-y', y);
+
+                    if (cell.water) cellDiv.classList.add('water');
+                    else if (cell.owner === null) cellDiv.classList.add('neutral');
+                    else if (cell.owner === myPlayerId) cellDiv.classList.add('player1');
+                    else cellDiv.classList.add('player2');
+
+                    let terrainIcon = '⬜';
+                    switch(cell.terrain) {
+                        case 'FOREST': terrainIcon = '🌲'; break;
+                        case 'MOUNTAIN': terrainIcon = '⛰️'; break;
+                        case 'CITY': terrainIcon = '🏙️'; break;
+                        case 'WATER': terrainIcon = '💧'; break;
+                        default: terrainIcon = '🌾';
+                    }
+
+                    cellDiv.innerHTML = `
+                        <div class="terrain-icon">${terrainIcon}</div>
+                        <div class="troops">⚔️ ${cell.troops}</div>
                     `;
-                    document.getElementById('game-container').style.display = 'flex';
-                    await initGame();
-                    return true;
+                    cellDiv.onclick = () => selectCell(cell);
+
+                    if (selectedCell && selectedCell.x === x && selectedCell.y === y) {
+                        cellDiv.classList.add('selected');
+                    }
+                    mapDiv.appendChild(cellDiv);
                 }
             }
-
-            // Не авторизованы
-            isAuthenticated = false;
-            document.getElementById('auth-container').innerHTML = `
-                <div class="login-panel">
-                    <button class="login-btn" onclick="login()">🔐 Войти</button>
-                    <button class="register-btn" onclick="register()">📝 Зарегистрироваться</button>
-                </div>
-            `;
-            document.getElementById('game-container').style.display = 'none';
-            return false;
-
-        } catch (e) {
-            console.error('Error checking auth:', e);
-            isAuthenticated = false;
-            document.getElementById('auth-container').innerHTML = `
-                <div class="login-panel">
-                    <button class="login-btn" onclick="login()">🔐 Войти</button>
-                    <button class="register-btn" onclick="register()">📝 Зарегистрироваться</button>
-                </div>
-            `;
-            document.getElementById('game-container').style.display = 'none';
-            return false;
         }
-    }
 
-    function login() {
-        window.location.href = '/oauth2/sign_in';
-    }
-
-    function register() {
-        window.location.href = '/oauth2/sign_in';
-    }
-
-    function logout() {
-        window.location.href = '/oauth2/sign_out?rd=http://localhost/';
-    }
-
-    // ========== ИГРОВЫЕ ФУНКЦИИ ==========
-    async function loadLeaderboard() {
-        try {
-            const response = await fetch('/api/user/leaderboard');
-            const leaderboard = await response.json();
-            const container = document.getElementById('leaderboard-list');
-            if (!leaderboard || leaderboard.length === 0) {
-                container.innerHTML = '<div style="text-align: center;">Нет данных</div>';
+        function selectCell(cell) {
+            if (!gameState.canAttack) {
+                AuthApi.showAlert('battle-log', 'alert-warning', 'Сначала начните ход!');
                 return;
             }
-            container.innerHTML = leaderboard.map((player, index) => `
-                <div class="leaderboard-entry">
-                    <span class="${index === 0 ? 'rank-1' : index === 1 ? 'rank-2' : index === 2 ? 'rank-3' : ''}">
-                        ${index + 1}. ${player.name}
-                    </span>
-                    <span>🏆 ${player.totalWins} побед</span>
+
+            selectedCell = cell;
+            renderMap();
+
+            attackPanel.classList.remove('hidden');
+
+            const myCells = mapData.cells?.filter(c => c.owner === myPlayerId && !c.water);
+            if (myCells?.length > 0) {
+                troopsInput.max = Math.min(20, myCells[0].troops);
+                troopsInput.min = 1;
+                troopsInput.value = Math.min(troopsInput.max, Math.floor(cell.troops / 2) || 1);
+            }
+        }
+
+        async function checkGameState() {
+            const {body} = await GameApi.getGameState();
+            if (body) {
+                gameState = body;
+                myPlayerId = body.myPlayerId;
+                myPlayerName = body.myPlayerName;
+
+                document.getElementById('turn-number').innerText = body.turn;
+                document.getElementById('current-player').innerText = body.currentTurnPlayer || '-';
+
+                if (body.winner) {
+                    document.getElementById('turn-status').innerHTML = `🏆 ПОБЕДИТЕЛЬ: ${body.winner}! 🏆`;
+                    return;
+                }
+
+                if (body.canAttack) {
+                    startTurnBtn.classList.add('hidden');
+                    endTurnBtn.classList.remove('hidden');
+                    document.getElementById('turn-status').innerHTML = `🎲 ВАШ ХОД! Действуйте! (${myPlayerName})`;
+                } else if (body.canStartTurn) {
+                    startTurnBtn.classList.remove('hidden');
+                    endTurnBtn.classList.add('hidden');
+                    document.getElementById('turn-status').innerHTML = `🎯 ВАШ ХОД! Нажмите "Начать ход" (${myPlayerName})`;
+                } else {
+                    startTurnBtn.classList.add('hidden');
+                    endTurnBtn.classList.add('hidden');
+                    document.getElementById('turn-status').innerHTML = `⏳ Ожидание хода: ${body.currentTurnPlayer || 'противника'}`;
+                }
+
+                updateResources(body);
+            }
+        }
+
+        function updateResources(state) {
+            if (state) {
+                document.getElementById('gold').innerText = state.myGold || 0;
+                document.getElementById('wood').innerText = state.myWood || 0;
+                document.getElementById('food').innerText = state.myFood || 0;
+                document.getElementById('total-troops').innerText = state.myTroops || 0;
+            }
+        }
+
+        function updatePlayersList() {
+            const playersDiv = document.getElementById('players-list');
+            if (!playersDiv) return;
+
+            if (!mapData?.players?.length) {
+                playersDiv.innerHTML = '<div>Нет игроков</div>';
+                return;
+            }
+
+            playersDiv.innerHTML = mapData.players.map(player => `
+                <div class="flex justify-between items-center py-2 border-b border-base-300">
+                    <div>
+                        <span class="badge ${player.id === myPlayerId ? 'badge-success' : 'badge-neutral'} mr-2"></span>
+                        <span>${player.name} ${player.id === myPlayerId ? '(Вы)' : ''}</span>
+                    </div>
+                    <div class="text-sm">
+                        <span>🏠 ${player.cellsCount} | 🏆 ${player.victories}</span>
+                    </div>
                 </div>
             `).join('');
-        } catch (e) {
-            console.error('Error loading leaderboard:', e);
         }
-    }
 
-    async function saveGame() {
-        try {
-            const response = await fetch('/api/save/save', { method: 'POST' });
-            const result = await response.json();
-            showNotification(result.message, 'success');
-        } catch (e) {
-            showNotification('Ошибка сохранения', 'error');
+        async function loadLeaderboard() {
+            const {body} = await GameApi.getLeaderboard();
+            if (body) {
+                const container = document.getElementById('leaderboard-list');
+                container.innerHTML = body.map((player, idx) => `
+                    <div class="flex justify-between items-center">
+                        <span class="${idx < 3 ? 'font-bold text-primary' : ''}">${idx + 1}. ${player.name}</span>
+                        <span>🏆 ${player.totalWins} побед</span>
+                    </div>
+                `).join('');
+            }
         }
-    }
 
-    async function loadGame() {
-        try {
-            const response = await fetch('/api/save/load', { method: 'POST' });
-            const result = await response.json();
-            if (result.success) {
-                showNotification(result.message, 'success');
-                setTimeout(() => location.reload(), 1000);
+        function addBattleLog(message) {
+            const logDiv = document.getElementById('battle-log');
+            const entry = document.createElement('div');
+            entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+        }
+
+        startTurnBtn.onclick = async () => {
+            const {body} = await GameApi.startTurn();
+            if (body?.success) {
+                addBattleLog('🎮 Начат новый ход! Получены ресурсы.');
+                await checkGameState();
+                await loadMap();
             } else {
-                showNotification(result.message, 'error');
+                AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Не удалось начать ход');
             }
-        } catch (e) {
-            showNotification('Ошибка загрузки', 'error');
-        }
-    }
+        };
 
-    async function loadPlayersForAI() {
-        try {
-            const response = await fetch('/api/players');
-            const players = await response.json();
-            const select = document.getElementById('ai-player');
-            select.innerHTML = '<option value="">-- Выберите игрока для AI --</option>';
-            players.forEach(player => {
-                select.innerHTML += `<option value="${player.name}">${player.name}</option>`;
-            });
-        } catch (e) {
-            console.error('Ошибка загрузки игроков для AI:', e);
-        }
-    }
-
-    async function setAITactic() {
-        const tactic = document.getElementById('ai-tactic').value;
-        try {
-            const response = await fetch('/api/ai/set-tactic', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({tactic: tactic})
-            });
-            const result = await response.json();
-            showNotification(result.message || `Тактика изменена на ${tactic}`, result.success ? 'success' : 'error');
-        } catch (e) {
-            showNotification('Ошибка установки тактики', 'error');
-        }
-    }
-
-    async function setAIPlayer() {
-        const playerName = document.getElementById('ai-player').value;
-        if (!playerName) {
-            showNotification('Выберите игрока!', 'error');
-            return;
-        }
-        try {
-            const response = await fetch('/api/ai/set-player', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({playerName: playerName})
-            });
-            const result = await response.json();
-            showNotification(result.message, result.success ? 'success' : 'error');
-        } catch (e) {
-            showNotification('Ошибка назначения AI', 'error');
-        }
-    }
-
-    async function toggleAI() {
-        aiEnabled = !aiEnabled;
-        try {
-            const response = await fetch('/api/ai/enable', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({enabled: aiEnabled})
-            });
-            const btn = document.getElementById('ai-toggle-btn');
-            if (aiEnabled) {
-                btn.innerHTML = '🟢 AI Включен';
-                btn.classList.remove('inactive');
-                btn.classList.add('active');
+        endTurnBtn.onclick = async () => {
+            const {body} = await GameApi.endTurn();
+            if (body?.success) {
+                addBattleLog('✅ Ход завершен!');
+                selectedCell = null;
+                attackPanel.classList.add('hidden');
+                await checkGameState();
+                await loadMap();
             } else {
-                btn.innerHTML = '🔴 AI Выключен';
-                btn.classList.remove('active');
-                btn.classList.add('inactive');
+                AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Не удалось завершить ход');
             }
-            showNotification(`AI ${aiEnabled ? 'включен' : 'выключен'}`, 'success');
-        } catch (e) {
-            showNotification('Ошибка переключения AI', 'error');
-        }
-    }
+        };
 
-    async function selectPlayerByName(playerName) {
-        try {
-            const response = await fetch('/api/players');
-            const players = await response.json();
-            const player = players.find(p => p.name === playerName);
-            if (player) {
-                const selectResponse = await fetch('/api/select-player', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({playerId: player.id})
-                });
-                const data = await selectResponse.json();
-                if (data.success) {
-                    myPlayerId = player.id;
-                    myPlayerName = player.name;
-                    showNotification(`✅ Выбран игрок: ${player.name}`, 'success');
-                    document.querySelectorAll('.player-btn').forEach(btn => {
-                        btn.classList.remove('active');
-                        if (btn.innerText.includes(playerName)) btn.classList.add('active');
-                    });
-                    selectedCell = null;
-                    await loadMap();
-                    await checkGameState();
-                } else showNotification(data.message, 'error');
-            }
-        } catch (e) {
-            console.error('Ошибка выбора игрока:', e);
-        }
-    }
-
-    async function loadMap() {
-        try {
-            const response = await fetch('/api/map');
-            const newMapData = await response.json();
-            if (mapData && mapData.cells) checkForChanges(mapData.cells, newMapData.cells);
-            mapData = newMapData;
-            if (!myPlayerId && mapData.players && mapData.players.length > 0) {
-                const defaultPlayer = mapData.players.find(p => p.name === 'Красный Лорд') || mapData.players[0];
-                if (defaultPlayer) await selectPlayerByName(defaultPlayer.name);
-            }
-            renderMap();
-            updatePlayersList();
-            updateResources();
-        } catch (e) {
-            console.error('Ошибка загрузки карты:', e);
-        }
-    }
-
-    function checkForChanges(oldCells, newCells) {
-        for (let i = 0; i < newCells.length; i++) {
-            const newCell = newCells[i];
-            const oldCell = oldCells.find(c => c.x === newCell.x && c.y === newCell.y);
-            if (oldCell) {
-                if (oldCell.owner !== newCell.owner && newCell.owner === myPlayerId) {
-                    addBattleLog(`🎉 Захвачена клетка [${newCell.x},${newCell.y}]!`);
-                    showNotification(`🎉 Захвачена клетка [${newCell.x},${newCell.y}]!`, 'success');
-                    const cells = document.querySelectorAll('.cell');
-                    const index = newCell.y * 10 + newCell.x;
-                    if (cells[index]) animateAttack(cells[index], true);
-                } else if (Math.abs(oldCell.troops - newCell.troops) > 5 && oldCell.troops > newCell.troops) {
-                    addBattleLog(`⚔️ Битва на клетке [${newCell.x},${newCell.y}]: ${oldCell.troops} → ${newCell.troops} войск`);
-                    const cells = document.querySelectorAll('.cell');
-                    const index = newCell.y * 10 + newCell.x;
-                    if (cells[index]) animateAttack(cells[index], false);
-                }
-            }
-        }
-    }
-
-    function renderMap() {
-        const mapDiv = document.getElementById('map');
-        if (!mapData) return;
-        mapDiv.innerHTML = '';
-        for (let y = 0; y < 10; y++) {
-            for (let x = 0; x < 10; x++) {
-                const cell = mapData.cells.find(c => c.x === x && c.y === y);
-                if (!cell) continue;
-                const cellDiv = document.createElement('div');
-                cellDiv.className = 'cell';
-                cellDiv.setAttribute('data-x', x);
-                cellDiv.setAttribute('data-y', y);
-                if (cell.water) cellDiv.classList.add('water');
-                else if (cell.owner === null) cellDiv.classList.add('neutral');
-                else if (cell.owner === myPlayerId) cellDiv.classList.add('player1');
-                else cellDiv.classList.add('player2');
-                let terrainIcon = '⬜';
-                switch(cell.terrain) {
-                    case 'FOREST': terrainIcon = '🌲'; break;
-                    case 'MOUNTAIN': terrainIcon = '⛰️'; break;
-                    case 'CITY': terrainIcon = '🏙️'; break;
-                    case 'WATER': terrainIcon = '💧'; break;
-                    default: terrainIcon = '🌾';
-                }
-                cellDiv.innerHTML = `<div class="terrain-icon">${terrainIcon}</div><div class="troops">⚔️ ${cell.troops}</div><div class="level">⭐${cell.level || 1}</div>`;
-                cellDiv.onclick = () => selectCell(cell);
-                if (selectedCell && selectedCell.x === x && selectedCell.y === y) cellDiv.classList.add('selected');
-                mapDiv.appendChild(cellDiv);
-            }
-        }
-    }
-
-    function selectCell(cell) {
-        logDebug(`selectCell: canAttack=${gameState.canAttack}`);
-
-        if (!gameState.canAttack) {
-            if (gameState.canStartTurn) {
-                showNotification('Сначала нажмите "Начать ход"!', 'error');
-            } else {
-                showNotification('Сейчас не ваш ход!', 'error');
-            }
-            return;
-        }
-
-        selectedCell = cell;
-        renderMap();
-
-        let ownerName = 'Нейтральная';
-        if (cell.owner) {
-            const owner = mapData.players.find(p => p.id === cell.owner);
-            if (owner) ownerName = owner.name;
-        }
-
-        let terrainName = 'Равнина';
-        switch(cell.terrain) {
-            case 'FOREST': terrainName = '🌲 Лес'; break;
-            case 'MOUNTAIN': terrainName = '⛰️ Горы'; break;
-            case 'CITY': terrainName = '🏙️ Город'; break;
-            case 'WATER': terrainName = '💧 Вода'; break;
-        }
-
-        document.getElementById('selected-info').innerHTML = `
-            <strong>📍 Клетка [${cell.x}, ${cell.y}]</strong><br><br>
-            🏔️ Местность: ${terrainName}<br>
-            ⭐ Уровень: ${cell.level || 1}<br>
-            ⚔️ Войск: ${cell.troops}<br>
-            👑 Владелец: ${ownerName}
-        `;
-
-        const attackControls = document.getElementById('attack-controls');
-
-        if (cell.owner !== myPlayerId && !cell.water && gameState.canAttack) {
-            attackControls.style.display = 'block';
-            const myCells = mapData.cells.filter(c => c.owner === myPlayerId && !c.water);
-            if (myCells.length > 0) {
-                const maxTroops = Math.min(20, myCells[0].troops);
-                const troopsInput = document.getElementById('troops-input');
-                troopsInput.value = Math.min(maxTroops, Math.floor(cell.troops / 2) || 1);
-                troopsInput.max = maxTroops;
-                troopsInput.min = 1;
-            }
-        } else {
-            attackControls.style.display = 'none';
-        }
-    }
-
-    async function checkGameState() {
-        if (!isAuthenticated) return;
-
-        try {
-            const response = await fetch('/api/game-state');
-            const newState = await response.json();
-
-            gameState = newState;
-            myPlayerId = gameState.myPlayerId;
-            myPlayerName = gameState.myPlayerName;
-
-            logDebug(`canStartTurn=${gameState.canStartTurn}, canAttack=${gameState.canAttack}, gameState=${gameState.gameState}`);
-
-            document.getElementById('turn-number').innerText = gameState.turn;
-            document.getElementById('current-player').innerText = gameState.currentTurnPlayer || '-';
-
-            if (gameState.winner) {
-                document.getElementById('turn-status').innerHTML = `🏆 ПОБЕДИТЕЛЬ: ${gameState.winner}! 🏆`;
-                document.getElementById('turn-status').style.color = '#fbbf24';
+        attackBtn.onclick = async () => {
+            if (!selectedCell) {
+                AuthApi.showAlert('battle-log', 'alert-warning', 'Выберите клетку для атаки!');
                 return;
             }
 
-            if (gameState.canAttack) {
-                document.getElementById('start-turn-btn').style.display = 'none';
-                document.getElementById('end-turn-btn').style.display = 'block';
-                document.getElementById('turn-status').innerHTML = `🎲 ВАШ ХОД! Действуйте! (${myPlayerName})`;
-                document.getElementById('turn-status').style.color = '#10b981';
-            } else if (gameState.canStartTurn) {
-                document.getElementById('start-turn-btn').style.display = 'block';
-                document.getElementById('end-turn-btn').style.display = 'none';
-                document.getElementById('turn-status').innerHTML = `🎯 ВАШ ХОД! Нажмите "Начать ход" (${myPlayerName})`;
-                document.getElementById('turn-status').style.color = '#fbbf24';
-            } else {
-                document.getElementById('start-turn-btn').style.display = 'block';
-                document.getElementById('end-turn-btn').style.display = 'none';
-                document.getElementById('turn-status').innerHTML = `⏳ Ожидание хода игрока: ${gameState.currentTurnPlayer || 'противника'}`;
-                document.getElementById('turn-status').style.color = '#fbbf24';
+            const troops = troopsInput.value;
+            if (!troops || troops < 1) {
+                AuthApi.showAlert('battle-log', 'alert-warning', 'Введите количество войск!');
+                return;
             }
 
-            updateResources();
-        } catch (e) {
-            console.error('Ошибка проверки состояния:', e);
-        }
-    }
-
-    async function startTurn() {
-        if (!myPlayerId) {
-            showNotification('Сначала выберите игрока!', 'error');
-            return;
-        }
-
-        logDebug(`startTurn called for ${myPlayerName}`);
-
-        try {
-            const response = await fetch('/api/start-turn', { method: 'POST' });
-            const result = await response.json();
-
-            logDebug(`startTurn result: ${result.success}`);
-
-            if (result.success) {
-                showNotification('🎮 Ход начался!', 'success');
-                addBattleLog('🎮 Начат новый ход!');
-                await checkGameState();
-                await loadMap();
-            } else {
-                showNotification('❌ ' + result.message, 'error');
-            }
-        } catch (e) {
-            console.error('Ошибка начала хода:', e);
-            showNotification('Ошибка: ' + e.message, 'error');
-        }
-    }
-
-    async function endTurn() {
-        if (!myPlayerId) {
-            showNotification('Сначала выберите игрока!', 'error');
-            return;
-        }
-
-        logDebug(`endTurn called for ${myPlayerName}`);
-
-        try {
-            const response = await fetch('/api/end-turn', { method: 'POST' });
-            const result = await response.json();
-
-            logDebug(`endTurn result: ${result.success}`);
-
-            if (result.success) {
-                showNotification('✅ Ход завершен!', 'success');
-                selectedCell = null;
-                document.getElementById('attack-controls').style.display = 'none';
-                await checkGameState();
-                await loadMap();
-            } else {
-                showNotification('❌ ' + result.message, 'error');
-            }
-        } catch (e) {
-            console.error('Ошибка завершения хода:', e);
-            showNotification('Ошибка: ' + e.message, 'error');
-        }
-    }
-
-    async function executeAttack() {
-        if (!selectedCell) {
-            showNotification('Выберите клетку для атаки!', 'error');
-            return;
-        }
-
-        logDebug(`executeAttack: canAttack=${gameState.canAttack}`);
-
-        if (!gameState.canAttack) {
-            showNotification('Сначала начните ход кнопкой "Начать ход"!', 'error');
-            return;
-        }
-
-        const troops = document.getElementById('troops-input').value;
-        if (!troops || troops < 1) {
-            showNotification('Введите количество войск (не менее 1)', 'error');
-            return;
-        }
-
-        const myCells = mapData.cells.filter(c => c.owner === myPlayerId && !c.water);
-        if (myCells.length === 0) {
-            showNotification('У вас нет клеток для атаки!', 'error');
-            return;
-        }
-
-        const targetElement = document.querySelector(`.cell[data-x='${selectedCell.x}'][data-y='${selectedCell.y}']`);
-        if (targetElement) animateAttack(targetElement, false);
-
-        try {
-            const response = await fetch('/api/attack', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ toX: selectedCell.x, toY: selectedCell.y, troops: parseInt(troops) })
-            });
-
-            const result = await response.json();
-            logDebug(`Attack result: ${result.status}`);
-
-            if (result.status === 'ok') {
-                showNotification(result.message, 'success');
+            const {body} = await GameApi.attack(selectedCell.x, selectedCell.y, parseInt(troops));
+            if (body?.status === 'ok') {
                 addBattleLog(`⚔️ Атака на клетку [${selectedCell.x},${selectedCell.y}] с ${troops} войсками!`);
                 await loadMap();
                 await checkGameState();
             } else {
-                showNotification('❌ ' + result.message, 'error');
+                AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Ошибка атаки');
             }
-        } catch (e) {
-            console.error('Attack error:', e);
-            showNotification('Ошибка: ' + e.message, 'error');
-        }
-    }
+        };
 
-    function updatePlayersList() {
-        if (!mapData || !mapData.players) return;
-        const playersDiv = document.getElementById('players-list');
-        if (mapData.players.length === 0) {
-            playersDiv.innerHTML = '<div style="text-align: center;">Нет игроков</div>';
-            return;
-        }
-        playersDiv.innerHTML = mapData.players.map(player => `
-            <div class="player-card" onclick="selectPlayerByName('${player.name}')">
-                <div style="font-weight: bold;">
-                    <span class="status-badge" style="background: ${player.id === myPlayerId ? '#10b981' : '#3b82f6'}"></span>
-                    ${player.name} ${player.id === myPlayerId ? '(Вы)' : ''}
-                </div>
-                <div>🏠 Клеток: ${player.cellsCount}</div>
-                <div>🏆 Побед: ${player.victories}</div>
-                <div>💰 Золото: ${player.gold || 0}</div>
-                <div>⚔️ Войска: ${player.totalTroops || 0}</div>
-            </div>
-        `).join('');
-    }
+        logoutButton.addEventListener("click", async () => {
+            await AuthApi.logout();
+            AuthApi.showAlert("battle-log", "alert-success", "Сессия завершена");
+            setTimeout(() => {
+                window.location.href = "/login";
+            }, 500);
+        });
 
-    function updateResources() {
-        if (gameState) {
-            document.getElementById('gold').innerText = gameState.myGold || 0;
-            document.getElementById('wood').innerText = gameState.myWood || 0;
-            document.getElementById('food').innerText = gameState.myFood || 0;
-            document.getElementById('total-troops').innerText = gameState.myTroops || 0;
-            document.getElementById('my-cells').innerText = gameState.myCells || 0;
-        }
-    }
-
-    function refreshMap() { loadMap(); checkGameState(); }
-
-    async function initGame() {
-        await loadMap();
-        await checkGameState();
-        await loadPlayersForAI();
-        setInterval(() => checkGameState(), 3000);
-        setInterval(() => loadLeaderboard(), 30000);
-        setInterval(() => { if (!gameState.canAttack && !gameState.canStartTurn) loadMap(); }, 5000);
-        setInterval(() => loadPlayersForAI(), 10000);
-    }
-
-    // ========== ИНИЦИАЛИЗАЦИЯ ==========
-    async function init() {
-        await checkAuth();
+        await AuthApi.ensureCsrfCookie();
+        await refreshAuthState();
         await loadLeaderboard();
-    }
 
-    init();
+        setInterval(() => {
+            if (!gameState.canAttack && !gameState.canStartTurn) {
+                loadMap();
+            }
+            checkGameState();
+            loadLeaderboard();
+        }, 5000);
+    });
 </script>
 </body>
 </html>

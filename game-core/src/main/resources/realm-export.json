@@ -1,54 +1,54 @@
 {
   "realm": "geostrat",
   "enabled": true,
-  "displayName": "GeoStrat Game",
-  "registrationAllowed": true,
-  "registrationEmailAsUsername": true,
-  "editUsernameAllowed": false,
-  "resetPasswordAllowed": true,
-  "rememberMe": true,
-  "verifyEmail": false,
+  "registrationAllowed": false,
   "loginWithEmailAllowed": true,
-  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": true,
+
   "clients": [
     {
       "clientId": "geostrat-client",
+      "name": "Geostrat Spring App",
       "enabled": true,
+      "protocol": "openid-connect",
       "publicClient": false,
-      "secret": "${OAUTH2_CLIENT_SECRET}",
-      "redirectUris": [
-        "http://localhost/oauth2/callback",
-        "http://localhost:8080/*"
-      ],
-      "webOrigins": ["http://localhost:8080"],
+      "secret": "CHANGE_ME_SECRET",
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": true
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:8080/*",
+        "http://localhost:8080/login/oauth2/code/keycloak"
+      ],
+      "webOrigins": [
+        "http://localhost:8080"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "access": {
+        "view": true,
+        "configure": true,
+        "manage": true
+      }
     }
   ],
-  "users": [],
-  "authenticationFlows": [
+
+  "users": [
     {
-      "alias": "registration",
-      "description": "Registration flow",
-      "providerId": "basic-flow",
-      "topLevel": true,
-      "builtIn": true,
-      "authenticationExecutions": [
+      "username": "test-user",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "User",
+      "email": "test@local",
+      "credentials": [
         {
-          "authenticator": "registration-page-form",
-          "requirement": "REQUIRED",
-          "priority": 10
-        },
-        {
-          "authenticator": "registration-user-creation",
-          "requirement": "REQUIRED",
-          "priority": 20
-        },
-        {
-          "authenticator": "registration-profile-action",
-          "requirement": "REQUIRED",
-          "priority": 30
+          "type": "password",
+          "value": "test123",
+          "temporary": false
         }
       ]
     }
