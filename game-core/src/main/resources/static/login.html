@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css"/>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css"/>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- ИСПРАВЛЕНО: убрал /static из пути -->
     <script src="/js/auth.js" defer></script>
 </head>
 <body class="min-h-screen bg-base-200">
@@ -26,9 +27,12 @@
             <div class="card-body">
                 <h2 class="card-title">Логин через Keycloak</h2>
                 <p class="text-sm text-base-content/70">
-                    Приложение перенаправит браузер в Keycloak, обменяет код на токены и создаст локальную сессию.
+                    Приложение перенаправит вас на страницу входа Keycloak.
+                    После успешной аутентификации вы вернетесь в игру.
                 </p>
-                <button id="login-button" class="btn btn-primary w-full sm:w-auto" type="button">🔐 Войти через Keycloak</button>
+                <a href="/oauth2/authorization/keycloak" class="btn btn-primary w-full sm:w-auto">
+                    🔐 Войти через Keycloak
+                </a>
             </div>
         </article>
 
@@ -50,17 +54,23 @@
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         const AuthApi = window.AuthApi;
-        const loginButton = document.getElementById("login-button");
         const searchParams = new URLSearchParams(window.location.search);
 
+        // Проверяем параметры ошибки
         if (searchParams.has("error")) {
             AuthApi.showAlert("page-alert", "alert-error", "Не удалось выполнить вход через Keycloak");
         } else if (searchParams.has("logout")) {
             AuthApi.showAlert("page-alert", "alert-success", "Вы вышли из приложения");
         }
 
-        loginButton.addEventListener("click", () => {
-            AuthApi.login();
+
+        AuthApi.getCurrentUser().then(({status, body}) => {
+            if (status === 200 && body?.data?.authenticated) {
+                AuthApi.showAlert("page-alert", "alert-success", "Вы уже авторизованы! Перенаправление в игру...");
+                setTimeout(() => {
+                    window.location.href = "/";
+                }, 2000);
+            }
         });
     });
 </script>

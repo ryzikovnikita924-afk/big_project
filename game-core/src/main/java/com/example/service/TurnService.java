@@ -88,8 +88,7 @@ public class TurnService {
 
     private void collectResourcesForPlayer(Player player) {
         int goldIncome = 0, woodIncome = 0, foodIncome = 0;
-
-        for (String cellId : player.getCapturedCellIds()) {
+        for (String cellId : player.getCapturedCellIds(player.getcapturedCells())) {
             Cell cell = gameWorld.getCell(cellId);
             if (cell != null && !cell.isWater()) {
                 int production = cell.getCurrentProduction();
@@ -102,7 +101,7 @@ public class TurnService {
             }
         }
 
-        goldIncome += player.getCapturedCellIds().size() * 10;
+        goldIncome += player.getTotalCells() * 10;
 
         if (goldIncome > 0) player.addResource(ResourceType.GOLD, goldIncome);
         if (woodIncome > 0) player.addResource(ResourceType.WOOD, woodIncome);
@@ -124,7 +123,7 @@ public class TurnService {
             player.addTroops(maxRecruits);
 
             List<Cell> playerCells = new ArrayList<>();
-            for (String cellId : player.getCapturedCellIds()) {
+            for (String cellId : player.getCapturedCellIds(player.getcapturedCells())) {
                 Cell cell = gameWorld.getCell(cellId);
                 if (cell != null && !cell.isWater()) {
                     playerCells.add(cell);
@@ -156,7 +155,7 @@ public class TurnService {
             return false;
         }
 
-        if (current.getCapturedCellIds().isEmpty()) {
+        if (current.getcapturedCells().isEmpty()) {
             System.out.println("💀 " + current.getName() + " уничтожен!");
             players.remove(currentPlayerIndex);
             if (players.size() == 1) {

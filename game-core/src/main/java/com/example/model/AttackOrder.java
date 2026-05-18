@@ -18,7 +18,7 @@ public class AttackOrder implements Comparable<AttackOrder> {
         this.attackerId = attackerId;
     }
 
-    // Геттеры и сеттеры
+
     public String getId() { return id; }
     public String getFromCellId() { return fromCellId; }
     public String getToCellId() { return toCellId; }

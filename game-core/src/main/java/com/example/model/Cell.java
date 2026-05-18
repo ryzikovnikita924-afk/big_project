@@ -63,14 +63,14 @@ public class Cell {
         return productionRate * level;
     }
 
-    // Улучшение клетки
+
     public boolean upgrade() {
         if (level >= 5) return false;
         level++;
         return true;
     }
 
-    // Можно ли улучшить
+
     public boolean canUpgrade() {
         return level < 5;
     }
@@ -89,12 +89,12 @@ public class Cell {
         return (int)(troopsCount * terrain.getDefenseBonus() * (1 + level * 0.1));
     }
 
-    // Пополнение войск
+
     public void addTroops(int amount) {
         this.troopsCount += amount;
     }
 
-    // Урон при защите
+
     public void takeDamage(int damage) {
         this.troopsCount = Math.max(0, this.troopsCount - damage);
     }

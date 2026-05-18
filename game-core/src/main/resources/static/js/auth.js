@@ -44,13 +44,13 @@ const AuthApi = (() => {
     }
 
     function login() {
-        // Используем OAuth2 Proxy endpoint
-        window.location.href = "/oauth2/start?rd=/";
+        // Редирект на Spring Security OAuth2 login endpoint
+        window.location.href = "/oauth2/authorization/keycloak";
     }
 
     async function logout() {
-        // Очищаем сессию через OAuth2 Proxy
-        window.location.href = "/oauth2/sign_out";
+        // Логаут через Spring Security
+        window.location.href = "/logout";
         return { response: { status: 302 }, body: null };
     }
 
@@ -65,7 +65,7 @@ const AuthApi = (() => {
         alertDiv.className = `alert ${type} mb-2`;
         alertDiv.innerHTML = `<span>${message}</span>`;
         container.insertBefore(alertDiv, container.firstChild);
-        setTimeout(() => alertDiv.remove(), 3000);
+        setTimeout(() => alertDiv.remove(), 5000);
     }
 
     return {

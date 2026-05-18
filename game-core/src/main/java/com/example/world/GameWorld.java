@@ -47,7 +47,7 @@ public class GameWorld {
         players.put(player.getId(), player);
         startCell.setOwnerId(player.getId());
         startCell.setTroopsCount(20);
-        player.addCell(cellId);
+        player.addCell(startCell);
         player.addTroops(20);
         System.out.printf("Игрок %s начал игру на клетке [%d,%d]%n", player.getName(), startX, startY);
     }
@@ -123,55 +123,46 @@ public class GameWorld {
     public void addPlayerDirect(Player player) {
         players.put(player.getId(), player);
     }
-    public void executeInstantAttack(String fromCellId, String toCellId, int troopsCount, String playerId) {
-        Cell fromCell = cells.get(fromCellId);
-        Cell toCell = cells.get(toCellId);
+    public void executeInstantAttack(List<Cell> playerterritory, Cell attackcell, String playerId) {
 
-        System.out.println("⚔️ Атака: " + fromCellId + " -> " + toCellId + " войска: " + troopsCount);
+        System.out.println("⚔️ Атака: " + playerId + " -> " +  "Клетки" +  attackcell);
 
-        if (fromCell == null || toCell == null) {
+        if (playerterritory == null || attackcell == null) {
             throw new IllegalArgumentException("Клетка не найдена");
         }
-        if (!fromCell.getOwnerId().equals(playerId)) {
-            throw new IllegalStateException("Это не ваша клетка!");
-        }
-        if (troopsCount > fromCell.getTroopsCount()) {
-            throw new IllegalStateException("Недостаточно войск!");
-        }
-        if (!engine.canAttack(fromCell, toCell)) {
+
+        if (!engine.canAttack(playerterritory, attackcell)) {
             throw new IllegalStateException("Атака невозможна!");
         }
 
         if (!canAttack(playerId)) {
             throw new IllegalStateException("Сейчас не ваш ход! Начните ход кнопкой 'Начать ход'.");
         }
-
-        int attackerPower = troopsCount;
-        int defenderPower = toCell.getDefenseBonus();
+        Player attacker = players.get(playerId);
+        int attackerPower = attacker.getTotalTroops();
+        int defenderPower = attackcell.getDefenseBonus();
 
         if (attackerPower > defenderPower) {
             int remainingTroops = attackerPower - defenderPower;
-            String oldOwnerId = toCell.getOwnerId();
+            String oldOwnerId = attackcell.getOwnerId();
 
-            toCell.setOwnerId(playerId);
-            toCell.setTroopsCount(remainingTroops);
-            fromCell.setTroopsCount(fromCell.getTroopsCount() - troopsCount);
+            attackcell.setOwnerId(playerId);
+            attackcell.setTroopsCount(remainingTroops);
+            attacker.setTroopsCount(attacker.getTotalTroops() - attackerPower);
 
-            Player attacker = players.get(playerId);
             if (attacker != null) {
-                attacker.addCell(toCellId);
+                attacker.addCell(attackcell);
                 attacker.addVictory();
             }
             if (oldOwnerId != null) {
                 Player oldOwner = players.get(oldOwnerId);
                 if (oldOwner != null) {
-                    oldOwner.removeCell(toCellId);
+                    oldOwner.removeCell(attackcell);
                 }
             }
             System.out.println("✅ Атака успешна! Клетка захвачена!");
         } else {
-            toCell.setTroopsCount(toCell.getTroopsCount() - attackerPower);
-            fromCell.setTroopsCount(fromCell.getTroopsCount() - troopsCount);
+            attacker.setTroopsCount(attacker.getTotalTroops() - defenderPower);
             System.out.println("❌ Атака отбита!");
         }
     }

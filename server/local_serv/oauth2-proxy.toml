@@ -2,9 +2,9 @@ provider = "keycloak"
 http_address = "0.0.0.0:4180"
 
 client_id = "geostrat-client"
-client_secret = "9SOuKBohMpi7QuksYZfv5o6mp3hYmu70"
+client_secret = "EkQ8rE0gBkNDhqbaML5QP4XXNnn9tn2n"
 redirect_url = "http://localhost:4180/oauth2/callback"
-oidc_issuer_url = "http://localhost:8081/realms/geostrat"
+oidc_issuer_url = "http://keycloak:8080/realms/geostrat"
 
 skip_oidc_discovery = false
 

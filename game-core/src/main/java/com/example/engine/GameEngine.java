@@ -2,6 +2,8 @@ package com.example.engine;
 
 import com.example.model.*;
 
+import java.util.List;
+
 public class GameEngine {
 
     private static final int ATTACK_DURATION_MS = 5000;
@@ -22,24 +24,20 @@ public class GameEngine {
     }
 
 
-    public boolean canAttack(Cell from, Cell to) {
+    public boolean canAttack(List<Cell> from, Cell to) {
         if (from == null || to == null) return false;
         if (to.isWater()) return false;
-        if (!areNeighbors(from, to)) return false;
-        if (from.isNeutral()) return false;
+        Cell cell= from.get(0);
+        if (cell.getOwnerId().equals(to.getOwnerId())) return false;
 
 
-        if (from.getOwnerId() != null && from.getOwnerId().equals(to.getOwnerId())) {
-            return false;
-        }
-
-        return from.getTroopsCount() > 0;
+        return true;
     }
 
 
-    public BattleResult resolveBattle(Cell attacker, Cell defender) {
-        int attackerPower = attacker.getTroopsCount();
-        int defenderPower = defender.getDefenseBonus(); // с учетом бонуса местности
+    public BattleResult resolveBattle(Player attacker, Cell defender) {
+        int attackerPower = attacker.getTotalTroops();
+        int defenderPower = defender.getDefenseBonus();
 
         System.out.printf("Битва: %d vs %d (бонус защиты: %.1f)%n",
                 attackerPower, defenderPower, defender.getTerrain().getDefenseBonus());
@@ -61,28 +59,7 @@ public class GameEngine {
     }
 
 
-    public void executeAttack(AttackOrder order, Cell fromCell, Cell toCell) {
-        if (!canAttack(fromCell, toCell)) {
-            throw new IllegalStateException("Атака невозможна!");
-        }
 
-        BattleResult result = resolveBattle(fromCell, toCell);
-
-        if (result.isAttackerWon()) {
-
-            toCell.setOwnerId(fromCell.getOwnerId());
-            toCell.setTroopsCount(result.getRemainingTroops());
-            fromCell.setTroopsCount(0);
-
-            System.out.printf(" %s захватил клетку [%d,%d]! Осталось войск: %d%n",
-                    fromCell.getOwnerId(), toCell.getX(), toCell.getY(), result.getRemainingTroops());
-        } else {
-            // Атака отбита
-            fromCell.setTroopsCount(0);
-            System.out.printf(" Атака на [%d,%d] отбита! У защитника осталось: %d войск%n",
-                    toCell.getX(), toCell.getY(), toCell.getTroopsCount());
-        }
-    }
 
     public int calculateResourceProduction(Cell cell) {
         if (cell.isNeutral() || cell.isWater()) return 0;

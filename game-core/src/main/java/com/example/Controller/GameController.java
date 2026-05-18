@@ -38,10 +38,8 @@ public class GameController {
         this.statisticsService = statisticsService;
         this.gamePersistenceService = gamePersistenceService;
         this.currentGameId = UUID.randomUUID().toString();
-        // НЕ вызываем initGame() здесь!
     }
 
-    // Новый метод для инициализации игры после авторизации
     private void initGameIfNeeded() {
         if (gameInitialized) {
             return;
@@ -55,26 +53,25 @@ public class GameController {
 
         gameWorld.createWorld(10, 10);
 
-        // НЕ создаем игроков! Они будут создаваться при регистрации через Keycloak
 
         gameWorld.start();
         gameInitialized = true;
         System.out.println("✅ Игровой мир создан!");
     }
 
-    // Метод для добавления игрока в игру после регистрации
+
     public void addPlayerToGame(String playerId, String playerName) {
-        // Проверяем, есть ли уже такой игрок в мире
+
         if (gameWorld.getPlayer(playerId) != null) {
             System.out.println("Игрок " + playerName + " уже в игре");
             return;
         }
 
-        // Создаем игрового персонажа
+
         Player gamePlayer = new Player(playerName);
         gamePlayer.setId(playerId);
 
-        // Находим стартовую позицию (свободную клетку)
+
         int startX = 2, startY = 2;
         if (!gameWorld.getPlayers().isEmpty()) {
             // Если есть другие игроки, ставим нового на противоположную сторону
@@ -89,12 +86,12 @@ public class GameController {
         }
         allPlayers.add(gamePlayer);
 
-        // Если это первый игрок, инициализируем TurnService
+
         if (allPlayers.size() == 1) {
             turnService.initialize(allPlayers);
             currentPlayerId = gamePlayer.getId();
         } else {
-            // Обновляем список игроков в TurnService
+
             turnService.updatePlayers(allPlayers);
         }
 
@@ -231,19 +228,17 @@ public class GameController {
             return Map.of("status", "error", "message", "У вас нет клеток для атаки!");
         }
 
-        Cell fromCell = playerCells.get(0);
+
         String toId = request.toX + ":" + request.toY;
         Cell toCell = gameWorld.getCell(toId);
 
         if (toCell == null) {
             return Map.of("status", "error", "message", "Клетка не найдена!");
         }
-        if (request.troops <= 0 || request.troops > fromCell.getTroopsCount()) {
-            return Map.of("status", "error", "message", "Недостаточно войск! У вас " + fromCell.getTroopsCount());
-        }
+
 
         try {
-            gameWorld.executeInstantAttack(fromCell.getId(), toId, request.troops, currentPlayerId);
+            gameWorld.executeInstantAttack(playerCells, toCell, currentPlayerId);
             gamePersistenceService.autoSave();
             return Map.of("status", "ok", "message", "⚔️ Атака выполнена!");
         } catch (Exception e) {
@@ -383,7 +378,7 @@ public class GameController {
             state.put("myWood", myPlayer.getResource(ResourceType.WOOD));
             state.put("myFood", myPlayer.getResource(ResourceType.FOOD));
             state.put("myTroops", myPlayer.getTotalTroops());
-            state.put("myCells", myPlayer.getCapturedCellIds().size());
+            state.put("myCells", myPlayer.getcapturedCells().size());
         }
 
         return state;

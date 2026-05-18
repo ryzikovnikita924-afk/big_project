@@ -26,7 +26,7 @@ public class PlayerSnapshot implements Serializable {
         for (Map.Entry<ResourceType, Integer> entry : player.getResources().entrySet()) {
             this.resources.put(entry.getKey().name(), entry.getValue());
         }
-        this.capturedCellIds = new HashSet<>(player.getCapturedCellIds());
+        this.capturedCellIds = new HashSet<>(player.getCapturedCellIds(player.getcapturedCells()));
         this.totalTroops = player.getTotalTroops();
         this.victories = player.getVictories();
         this.population = player.getPopulation();

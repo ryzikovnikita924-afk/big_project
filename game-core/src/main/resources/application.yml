@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: geostrat
+  thymeleaf:
+    enabled: false
+  web:
+    resources:
+      static-locations: classpath:/static/
+      add-mappings: true
+    error:
+      include-stacktrace: never
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        format_sql: true
+        default_schema: ${APP_DATABASE_SCHEMA}
+    show_sql: true
+    open-in-view: false
+  liquibase:
+    enabled: true
+    change-log: classpath:/db/changelog/db.changelog-master.xml
+    default-schema: ${spring.jpa.properties.hibernate.default_schema}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+  security:
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS}
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            issuer-uri: ${SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_ISSUER_URI:http://keycloak:8080/realms/geostrat}
+        registration:
+          keycloak:
+            client-id: ${SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_ID:geostrat-client}
+            client-secret: ${SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_SECRET:}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: authorization_code
+            redirect-uri: http://host.docker.internal:8080/login/oauth2/code/keycloak
+            provider: keycloak
+            scope:
+              - openid
+              - profile
+              - email
+
+logging:
+  level:
+    root: INFO
+    com.example: DEBUG
+
+    org.springframework.web: DEBUG
+    org.springframework.security.web: TRACE
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: TRACE
+    org.springframework.web.client: DEBUG

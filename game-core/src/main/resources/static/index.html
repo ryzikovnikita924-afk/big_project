@@ -43,6 +43,7 @@
         }
         .terrain-icon { font-size: 22px; }
     </style>
+    <!-- ИСПРАВЛЕННЫЕ ПУТИ - убрал /static -->
     <script src="/js/auth.js" defer></script>
     <script src="/js/game.js" defer></script>
 </head>
@@ -60,7 +61,7 @@
             <div class="flex flex-col items-start gap-3 sm:items-end">
                 <div id="auth-state" class="badge badge-neutral badge-lg">Проверяем сессию...</div>
                 <div class="flex gap-3">
-                    <a class="btn btn-outline btn-primary" href="/login">🔐 Войти через Keycloak</a>
+                    <a id="login-link" class="btn btn-outline btn-primary" href="/oauth2/authorization/keycloak">🔐 Войти через Keycloak</a>
                     <button id="logout-button" class="btn btn-neutral hidden" type="button">🚪 Выйти</button>
                 </div>
             </div>
@@ -137,6 +138,7 @@
 
         const authStateBadge = document.getElementById("auth-state");
         const logoutButton = document.getElementById("logout-button");
+        const loginLink = document.getElementById("login-link");
         const startTurnBtn = document.getElementById("start-turn-btn");
         const endTurnBtn = document.getElementById("end-turn-btn");
         const attackPanel = document.getElementById("attack-panel");
@@ -156,35 +158,52 @@
         };
 
         async function refreshAuthState() {
-            const {status, body} = await AuthApi.getCurrentUser();
-            const userInfo = body?.data?.userInfo ?? {};
-            const authenticated = status === 200 && body?.data?.authenticated;
+            try {
+                const {status, body} = await AuthApi.getCurrentUser();
+                const userInfo = body?.data?.userInfo ?? {};
+                const authenticated = status === 200 && body?.data?.authenticated;
 
-            authStateBadge.className = authenticated
-                ? "badge badge-success badge-lg"
-                : "badge badge-warning badge-lg";
-            authStateBadge.textContent = authenticated
-                ? `Вы вошли как ${AuthApi.extractDisplayName(userInfo)}`
-                : "Гостевой режим";
+                authStateBadge.className = authenticated
+                    ? "badge badge-success badge-lg"
+                    : "badge badge-warning badge-lg";
+                authStateBadge.textContent = authenticated
+                    ? `Вы вошли как ${AuthApi.extractDisplayName(userInfo)}`
+                    : "Гостевой режим";
 
-            logoutButton.classList.toggle("hidden", !authenticated);
+                if (loginLink) {
+                    if (authenticated) {
+                        loginLink.classList.add('hidden');
+                    } else {
+                        loginLink.classList.remove('hidden');
+                    }
+                }
 
-            if (authenticated) {
-                await loadMap();
-                await checkGameState();
+                logoutButton.classList.toggle("hidden", !authenticated);
+
+                if (authenticated) {
+                    await loadMap();
+                    await checkGameState();
+                }
+            } catch (error) {
+                console.error('Auth error:', error);
+                authStateBadge.textContent = "Ошибка авторизации";
             }
         }
 
         async function loadMap() {
-            const {body} = await GameApi.getMap();
-            if (body) {
-                mapData = body;
-                if (!myPlayerId && mapData.players?.length > 0) {
-                    myPlayerId = mapData.players[0]?.id;
-                    myPlayerName = mapData.players[0]?.name;
+            try {
+                const {body} = await GameApi.getMap();
+                if (body) {
+                    mapData = body;
+                    if (!myPlayerId && mapData.players?.length > 0) {
+                        myPlayerId = mapData.players[0]?.id;
+                        myPlayerName = mapData.players[0]?.name;
+                    }
+                    renderMap();
+                    updatePlayersList();
                 }
-                renderMap();
-                updatePlayersList();
+            } catch (error) {
+                console.error('Load map error:', error);
             }
         }
 
@@ -251,35 +270,39 @@
         }
 
         async function checkGameState() {
-            const {body} = await GameApi.getGameState();
-            if (body) {
-                gameState = body;
-                myPlayerId = body.myPlayerId;
-                myPlayerName = body.myPlayerName;
+            try {
+                const {body} = await GameApi.getGameState();
+                if (body) {
+                    gameState = body;
+                    myPlayerId = body.myPlayerId;
+                    myPlayerName = body.myPlayerName;
 
-                document.getElementById('turn-number').innerText = body.turn;
-                document.getElementById('current-player').innerText = body.currentTurnPlayer || '-';
+                    document.getElementById('turn-number').innerText = body.turn;
+                    document.getElementById('current-player').innerText = body.currentTurnPlayer || '-';
 
-                if (body.winner) {
-                    document.getElementById('turn-status').innerHTML = `🏆 ПОБЕДИТЕЛЬ: ${body.winner}! 🏆`;
-                    return;
+                    if (body.winner) {
+                        document.getElementById('turn-status').innerHTML = `🏆 ПОБЕДИТЕЛЬ: ${body.winner}! 🏆`;
+                        return;
+                    }
+
+                    if (body.canAttack) {
+                        startTurnBtn.classList.add('hidden');
+                        endTurnBtn.classList.remove('hidden');
+                        document.getElementById('turn-status').innerHTML = `🎲 ВАШ ХОД! Действуйте! (${myPlayerName})`;
+                    } else if (body.canStartTurn) {
+                        startTurnBtn.classList.remove('hidden');
+                        endTurnBtn.classList.add('hidden');
+                        document.getElementById('turn-status').innerHTML = `🎯 ВАШ ХОД! Нажмите "Начать ход" (${myPlayerName})`;
+                    } else {
+                        startTurnBtn.classList.add('hidden');
+                        endTurnBtn.classList.add('hidden');
+                        document.getElementById('turn-status').innerHTML = `⏳ Ожидание хода: ${body.currentTurnPlayer || 'противника'}`;
+                    }
+
+                    updateResources(body);
                 }
-
-                if (body.canAttack) {
-                    startTurnBtn.classList.add('hidden');
-                    endTurnBtn.classList.remove('hidden');
-                    document.getElementById('turn-status').innerHTML = `🎲 ВАШ ХОД! Действуйте! (${myPlayerName})`;
-                } else if (body.canStartTurn) {
-                    startTurnBtn.classList.remove('hidden');
-                    endTurnBtn.classList.add('hidden');
-                    document.getElementById('turn-status').innerHTML = `🎯 ВАШ ХОД! Нажмите "Начать ход" (${myPlayerName})`;
-                } else {
-                    startTurnBtn.classList.add('hidden');
-                    endTurnBtn.classList.add('hidden');
-                    document.getElementById('turn-status').innerHTML = `⏳ Ожидание хода: ${body.currentTurnPlayer || 'противника'}`;
-                }
-
-                updateResources(body);
+            } catch (error) {
+                console.error('Check game state error:', error);
             }
         }
 
@@ -315,15 +338,19 @@
         }
 
         async function loadLeaderboard() {
-            const {body} = await GameApi.getLeaderboard();
-            if (body) {
-                const container = document.getElementById('leaderboard-list');
-                container.innerHTML = body.map((player, idx) => `
-                    <div class="flex justify-between items-center">
-                        <span class="${idx < 3 ? 'font-bold text-primary' : ''}">${idx + 1}. ${player.name}</span>
-                        <span>🏆 ${player.totalWins} побед</span>
-                    </div>
-                `).join('');
+            try {
+                const {body} = await GameApi.getLeaderboard();
+                if (body && Array.isArray(body)) {
+                    const container = document.getElementById('leaderboard-list');
+                    container.innerHTML = body.map((player, idx) => `
+                        <div class="flex justify-between items-center">
+                            <span class="${idx < 3 ? 'font-bold text-primary' : ''}">${idx + 1}. ${player.name}</span>
+                            <span>🏆 ${player.totalWins} побед</span>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Load leaderboard error:', error);
             }
         }
 
@@ -384,7 +411,7 @@
             await AuthApi.logout();
             AuthApi.showAlert("battle-log", "alert-success", "Сессия завершена");
             setTimeout(() => {
-                window.location.href = "/login";
+                window.location.href = "/login.html";
             }, 500);
         });
 
