@@ -17,7 +17,7 @@ oauth2:
 enablePasswordDB: true
 
 staticClients:
-  - id: jbcd-oauth2-proxy
+  - id: geostrat-client
     secret: EkQ8rE0gBkNDhqbaML5QP4XXNnn9tn2n
     name: JBCD OAuth2 Proxy
     redirectURIs:

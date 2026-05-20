@@ -8,10 +8,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geostrat123}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init-postgres.sql
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U geostrat"]
+      test: [ "CMD-SHELL", "pg_isready -U geostrat" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -19,16 +20,68 @@ services:
       - geostrat-network
     restart: unless-stopped
 
-  dex:
-    image: dexidp/dex:v2.45.1
-    container_name: geostrat-dex
-    restart: unless-stopped
-    command: ["dex", "serve", "/etc/dex/config.yaml"]
+  zitadel-postgres:
+    image: postgres:17-alpine
+    container_name: zitadel-postgres
+    environment:
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: zitadel123
+      POSTGRES_DB: zitadel
     ports:
-      - "5556:5556"
+      - "5433:5432"
     volumes:
-      - ./config.yaml:/etc/dex/config.yaml:ro  # Оставляем как было
-      - dex_data:/var/dex
+      - zitadel-postgres-data:/var/lib/postgresql/data
+    networks:
+      - geostrat-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U zitadel" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:latest
+    container_name: zitadel
+    command: start-from-init --masterkey "MasterKeyForZitadel2024!VeryStro" --tlsMode disabled
+    env_file:
+      - .env
+    depends_on:
+      zitadel-postgres:
+        condition: service_healthy
+    environment:
+
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-postgres
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel123
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: zitadel123
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+
+
+      ZITADEL_FIRST_INSTANCE_ORG_NAME: Geostrat
+      ZITADEL_FIRST_INSTANCE_EXTERNAL_DOMAIN: localhost
+      ZITADEL_FIRST_INSTANCE_EXTERNAL_PORT: 8082
+      ZITADEL_FIRST_INSTANCE_EXTERNAL_SECURE: false
+
+      # Логирование
+      ZITADEL_LOG_LEVEL: debug
+
+      # Режим разработки для консоли
+      ZITADEL_CONSOLE_DEV_MODE: true
+
+      # Отключаем TLS для разработки
+      ZITADEL_TLS_ENABLED: false
+
+
+      ZITADEL_EXTERNAL_DOMAIN: localhost
+      ZITADEL_EXTERNAL_PORT: 8082
+      ZITADEL_EXTERNAL_SECURE: false
+
+    ports:
+      - "8082:8082"
     networks:
       - geostrat-network
 
@@ -62,7 +115,9 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis123}
-      OIDC_ISSUER_URI: http://dex:5556/dex
+      ZITADEL_ISSUER_URI: http://zitadel:8080
+      ZITADEL_CLIENT_ID: ${ZITADEL_CLIENT_ID}
+      ZITADEL_CLIENT_SECRET: ${ZITADEL_CLIENT_SECRET}
       SERVER_PORT: 8080
     ports:
       - "8080:8080"
@@ -71,6 +126,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      zitadel:
+        condition: service_started
     networks:
       - geostrat-network
     restart: unless-stopped
@@ -81,14 +138,12 @@ services:
     restart: unless-stopped
     ports:
       - "4180:4180"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
-      - ./oauth2-proxy.toml:/etc/oauth2-proxy/oauth2-proxy.toml:ro
+      - ./oauth2-proxy.toml:/etc/oauth2-proxy/oauth2-proxy.cfg:ro
     command:
-      - --config=/etc/oauth2-proxy/oauth2-proxy.toml
+      - --config=/etc/oauth2-proxy/oauth2-proxy.cfg
     depends_on:
-      - dex
+      - zitadel
       - game-core
     networks:
       - geostrat-network
@@ -100,4 +155,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
-  dex_data:
+  zitadel-postgres-data:

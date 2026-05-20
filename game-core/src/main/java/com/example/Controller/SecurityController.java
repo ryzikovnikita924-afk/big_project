@@ -1,7 +1,7 @@
 package com.example.Controller;
 
-import com.example.dto.auth.AuthStateResponse;
 import com.example.dto.UniversalResponse;
+import com.example.dto.auth.AuthStateResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -28,8 +28,10 @@ public class SecurityController {
             Authentication authentication,
             CsrfToken csrfToken
     ) {
-        // Явно материализуем токен, чтобы Spring записал XSRF-TOKEN в cookie.
-        csrfToken.getToken();
+        // Явно материализуем токен, чтобы Spring записал XSRF-TOKEN в cookie
+        if (csrfToken != null) {
+            csrfToken.getToken();
+        }
 
         boolean authenticated = authentication != null
                 && authentication.isAuthenticated()
@@ -39,7 +41,7 @@ public class SecurityController {
         if (authenticated) {
             Object principal = authentication.getPrincipal();
             if (principal instanceof OidcUser oidcUser) {
-                // Для OIDC Spring сам объединяет claims из id_token и userinfo endpoint.
+                // Для OIDC Spring сам объединяет claims из id_token и userinfo endpoint
                 userInfo = oidcUser.getClaims();
             } else {
                 userInfo = ((OAuth2AuthenticatedPrincipal) principal).getAttributes();
@@ -49,6 +51,7 @@ public class SecurityController {
         AuthStateResponse response = authenticated
                 ? new AuthStateResponse(true, userInfo)
                 : new AuthStateResponse(false, userInfo);
+
         HttpStatus status = authenticated ? HttpStatus.OK : HttpStatus.UNAUTHORIZED;
         return ResponseEntity.status(status).body(new UniversalResponse<>(response));
     }

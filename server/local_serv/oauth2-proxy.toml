@@ -1,31 +1,25 @@
 provider = "oidc"
 http_address = "0.0.0.0:4180"
-
-client_id = "geostrat-client"
-client_secret = "EkQ8rE0gBkNDhqbaML5QP4XXNnn9tn2n"
 redirect_url = "http://localhost:4180/oauth2/callback"
-oidc_issuer_url = "http://dex:5556/dex"
 
+# Zitadel конфигурация
+client_id = "YOUR_CLIENT_ID_FROM_ZITADEL"
+client_secret = "YOUR_CLIENT_SECRET_FROM_ZITADEL"
+oidc_issuer_url = "http://zitadel:8080"
 
-skip_oidc_discovery = true
+# Автоматическое обнаружение
+skip_oidc_discovery = false
 
-login_url = "http://localhost:5556/dex/auth"
-redeem_url = "http://host.docker.internal:5556/dex/token"
-oidc_jwks_url = "http://host.docker.internal:5556/dex/keys"
-profile_url = "http://host.docker.internal:5556/dex/userinfo"
-
-
-scope = "openid profile email"
+scope = "openid profile email urn:zitadel:iam:org:project:roles"
 email_domains = ["*"]
 skip_provider_button = true
 
-
+# Upstream
 upstreams = [
-    "http://host.docker.internal:8080/"
+    "http://game-core:8080/"
 ]
 
-
-
+# Публичные маршруты
 skip_auth_routes = [
     "^/$",
     "^/index\\.html$",
@@ -40,7 +34,7 @@ skip_auth_routes = [
     "^/api/game-state$"
 ]
 
-
+# Сессии
 session_store_type = "cookie"
 cookie_name = "_oauth2_proxy_geostrat"
 cookie_secret = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
@@ -48,11 +42,15 @@ cookie_secure = false
 cookie_httponly = true
 cookie_samesite = "lax"
 
+# Проксирование
 pass_user_headers = true
 pass_access_token = true
 set_xauthrequest = true
 
+# Домены
 whitelist_domains = [
     "localhost",
     "localhost:4180"
 ]
+
+insecure_oidc_allow_unverified_email = true
