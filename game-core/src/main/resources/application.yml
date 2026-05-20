@@ -11,16 +11,18 @@ spring:
       include-stacktrace: never
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: ${DATABASE_URL}
-    username: ${DATABASE_USERNAME}
-    password: ${DATABASE_PASSWORD}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/geostrat}
+    username: ${DATABASE_USERNAME:geostrat}
+    password: ${DATABASE_PASSWORD:geostrat123}
+    hikari:
+      connection-init-sql: CREATE SCHEMA IF NOT EXISTS ${APP_DATABASE_SCHEMA:geostrat}
   jpa:
     hibernate:
       ddl-auto: create
     properties:
       hibernate:
         format_sql: true
-        default_schema: ${APP_DATABASE_SCHEMA}
+        default_schema: ${APP_DATABASE_SCHEMA:geostrat}
     show_sql: true
     open-in-view: false
   liquibase:
@@ -29,24 +31,24 @@ spring:
     default-schema: ${spring.jpa.properties.hibernate.default_schema}
   data:
     redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   security:
     cors:
-      allowed-origins: ${CORS_ALLOWED_ORIGINS}
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8080,http://localhost:4180}
     oauth2:
       client:
         provider:
-          keycloak:
-            issuer-uri: ${SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_ISSUER_URI:http://keycloak:8080/realms/geostrat}
+          dex:
+            issuer-uri: ${OIDC_ISSUER_URI:http://dex:5556/dex}
         registration:
-          keycloak:
-            client-id: ${SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_ID:geostrat-client}
-            client-secret: ${SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_SECRET:}
+          dex:
+            client-id: ${OIDC_CLIENT_ID:geostrat-client}
+            client-secret: ${OIDC_CLIENT_SECRET:EkQ8rE0gBkNDhqbaML5QP4XXNnn9tn2n}
             client-authentication-method: client_secret_basic
             authorization-grant-type: authorization_code
-            redirect-uri: http://host.docker.internal:8080/login/oauth2/code/keycloak
-            provider: keycloak
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            provider: dex
             scope:
               - openid
               - profile
@@ -56,9 +58,6 @@ logging:
   level:
     root: INFO
     com.example: DEBUG
-
     org.springframework.web: DEBUG
-    org.springframework.security.web: TRACE
     org.springframework.security: DEBUG
-    org.springframework.security.oauth2: TRACE
-    org.springframework.web.client: DEBUG
+    org.springframework.security.oauth2: DEBUG

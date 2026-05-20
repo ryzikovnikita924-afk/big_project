@@ -17,6 +17,9 @@ public class PlayerEntity {
     @Column(name = "email", unique = true)
     private String email;
 
+    @Column(name = "password")  // ← ДОБАВЬТЕ ЭТО ПОЛЕ
+    private String password;
+
     @Column(name = "auth_id", unique = true)
     private String authId;
 
@@ -89,6 +92,9 @@ public class PlayerEntity {
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+
+    public String getPassword() { return password; }  // ← ДОБАВЬТЕ
+    public void setPassword(String password) { this.password = password; }  // ← ДОБАВЬТЕ
 
     public String getAuthId() { return authId; }
     public void setAuthId(String authId) { this.authId = authId; }

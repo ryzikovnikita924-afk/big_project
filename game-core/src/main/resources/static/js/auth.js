@@ -12,8 +12,13 @@ const AuthApi = (() => {
     }
 
     async function ensureCsrfCookie() {
-        if (readCookie(CSRF_COOKIE_NAME)) return;
-        await fetch("/api/auth/me", { method: "GET", credentials: "include" });
+        if (readCookie(CSRF_COOKIE_NAME)) {
+            return;
+        }
+        await fetch("/api/auth/me", {
+            method: "GET",
+            credentials: "include"
+        });
     }
 
     async function request(url, options = {}) {
@@ -23,7 +28,9 @@ const AuthApi = (() => {
         if (!["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase())) {
             await ensureCsrfCookie();
             const csrfToken = readCookie(CSRF_COOKIE_NAME);
-            if (csrfToken) headers.set(CSRF_HEADER_NAME, decodeURIComponent(csrfToken));
+            if (csrfToken) {
+                headers.set(CSRF_HEADER_NAME, decodeURIComponent(csrfToken));
+            }
         }
 
         const response = await fetch(url, {
@@ -35,37 +42,59 @@ const AuthApi = (() => {
 
         const isJson = response.headers.get("content-type")?.includes("application/json");
         const body = isJson ? await response.json() : null;
-        return { response, body };
+        return {response, body};
     }
 
     async function getCurrentUser() {
-        const { response, body } = await request("/api/auth/me");
-        return { status: response.status, body };
+        const {response, body} = await request("/api/auth/me");
+        return {
+            status: response.status,
+            body
+        };
     }
 
-    function login() {
-        // Редирект на Spring Security OAuth2 login endpoint
-        window.location.href = "/oauth2/authorization/keycloak";
+    async function login() {
+        // Перенаправление на OAuth2 Proxy
+        window.location.assign("/oauth2/authorization/dex");
     }
 
     async function logout() {
-        // Логаут через Spring Security
-        window.location.href = "/logout";
-        return { response: { status: 302 }, body: null };
+        // Логаут через backend
+        const result = await request("/api/auth/logout", {
+            method: "POST"
+        });
+
+        // Дополнительно очищаем сессию OAuth2 Proxy
+        if (result.response.ok) {
+            // Если есть прямой доступ к OAuth2 Proxy logout
+            await fetch("/oauth2/sign_out", { credentials: "include" }).catch(() => {});
+        }
+
+        return result;
     }
 
     function extractDisplayName(userInfo = {}) {
-        return userInfo.preferred_username ?? userInfo.email ?? userInfo.name ?? userInfo.sub ?? "Игрок";
+        return userInfo.email ?? userInfo.name ?? userInfo.preferred_username ?? userInfo.sub ?? "unknown";
     }
 
     function showAlert(targetId, type, message) {
         const container = document.getElementById(targetId);
-        if (!container) return;
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert ${type} mb-2`;
-        alertDiv.innerHTML = `<span>${message}</span>`;
-        container.insertBefore(alertDiv, container.firstChild);
-        setTimeout(() => alertDiv.remove(), 5000);
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="alert ${type} shadow-lg">
+                <span>${message}</span>
+            </div>
+        `;
+
+        // Автоматическое скрытие через 5 секунд
+        setTimeout(() => {
+            if (container.innerHTML === message) {
+                container.innerHTML = "";
+            }
+        }, 5000);
     }
 
     return {

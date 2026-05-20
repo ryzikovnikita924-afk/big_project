@@ -19,52 +19,18 @@ services:
       - geostrat-network
     restart: unless-stopped
 
-  keycloak-postgres:
-    image: postgres:15-alpine
-    container_name: geostrat-keycloak-db
-    environment:
-      POSTGRES_DB: keycloak
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak123}
-    volumes:
-      - keycloak_postgres_data:/var/lib/postgresql/data
-    networks:
-      - geostrat-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
-      interval: 10s
-      timeout: 10s
-      retries: 10
+  dex:
+    image: dexidp/dex:v2.45.1
+    container_name: geostrat-dex
     restart: unless-stopped
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:23.0
-    container_name: geostrat-keycloak
-    command:
-      - start-dev
-      - --http-port=8080
-      - --hostname-strict=false
-      - --hostname-strict-https=false
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
-      KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak123}
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
     ports:
-      - "8081:8080"
+      - "5556:5556"
+    volumes:
+      - ./config.yaml:/etc/dex/config.yaml:ro  # Оставляем как было
+      - dex_data:/var/dex
     networks:
       - geostrat-network
-    depends_on:
-      keycloak-postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
 
   redis:
     image: redis:7-alpine
@@ -84,8 +50,6 @@ services:
     restart: unless-stopped
 
   game-core:
-    extra_hosts:
-      - "localhost:host-gateway"
     build:
       context: ../../game-core
       dockerfile: Dockerfile
@@ -98,16 +62,8 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis123}
-
-      # ---- KEYCLOAK  ----
-      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/geostrat
-      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/geostrat/protocol/openid-connect/token
-      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/geostrat/protocol/openid-connect/certs
-      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_USER_INFO_URI: http://keycloak:8080/realms/geostrat/protocol/openid-connect/userinfo
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_ID: geostrat-client
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_SECRET: EkQ8rE0gBkNDhqbaML5QP4XXNnn9tn2n
+      OIDC_ISSUER_URI: http://dex:5556/dex
       SERVER_PORT: 8080
-
     ports:
       - "8080:8080"
     depends_on:
@@ -115,19 +71,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      keycloak:
-        condition: service_healthy
     networks:
       - geostrat-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   oauth2-proxy:
     image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.2
+    container_name: geostrat-oauth2-proxy
+    restart: unless-stopped
     ports:
       - "4180:4180"
     extra_hosts:
@@ -136,16 +87,17 @@ services:
       - ./oauth2-proxy.toml:/etc/oauth2-proxy/oauth2-proxy.toml:ro
     command:
       - --config=/etc/oauth2-proxy/oauth2-proxy.toml
-    restart: no
+    depends_on:
+      - dex
+      - game-core
     networks:
-      geostrat-network:
+      - geostrat-network
 
 networks:
   geostrat-network:
     driver: bridge
-    name: local_serv_geostrat-network
 
 volumes:
   postgres_data:
-  keycloak_postgres_data:
   redis_data:
+  dex_data:

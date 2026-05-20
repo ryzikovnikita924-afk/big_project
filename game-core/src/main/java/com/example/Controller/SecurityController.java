@@ -1,20 +1,20 @@
 package com.example.Controller;
 
-import com.example.dto.UniversalResponse;
 import com.example.dto.auth.AuthStateResponse;
+import com.example.dto.UniversalResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
 
 @Slf4j
@@ -23,50 +23,33 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 public class SecurityController {
 
-    @GetMapping(value = "/me", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> currentUser(
+    @GetMapping("/me")
+    public ResponseEntity<UniversalResponse<AuthStateResponse>> currentUser(
             Authentication authentication,
             CsrfToken csrfToken
     ) {
-        // Проверяем аутентификацию
+        // Явно материализуем токен, чтобы Spring записал XSRF-TOKEN в cookie.
+        csrfToken.getToken();
+
         boolean authenticated = authentication != null
                 && authentication.isAuthenticated()
-                && !(authentication.getPrincipal() instanceof String);
+                && authentication.getPrincipal() instanceof OAuth2AuthenticatedPrincipal;
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("authenticated", authenticated);
-
+        Map<String, Object> userInfo = Collections.emptyMap();
         if (authenticated) {
-            Map<String, Object> userInfo = new HashMap<>();
-
-            if (authentication instanceof OAuth2AuthenticationToken) {
-                OAuth2AuthenticationToken oauthToken = (OAuth2AuthenticationToken) authentication;
-                OAuth2AuthenticatedPrincipal principal = oauthToken.getPrincipal();
-
-                // Извлекаем нужные поля
-                userInfo.put("name", principal.getAttribute("name"));
-                userInfo.put("email", principal.getAttribute("email"));
-                userInfo.put("preferred_username", principal.getAttribute("preferred_username"));
-                userInfo.put("sub", principal.getAttribute("sub"));
-
-                response.put("user", userInfo);
-                response.put("provider", oauthToken.getAuthorizedClientRegistrationId());
+            Object principal = authentication.getPrincipal();
+            if (principal instanceof OidcUser oidcUser) {
+                // Для OIDC Spring сам объединяет claims из id_token и userinfo endpoint.
+                userInfo = oidcUser.getClaims();
+            } else {
+                userInfo = ((OAuth2AuthenticatedPrincipal) principal).getAttributes();
             }
-
-            if (csrfToken != null) {
-                response.put("csrfToken", csrfToken.getToken());
-            }
-
-            return ResponseEntity.ok(response);
         }
 
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("authenticated", false, "error", "Not authenticated"));
-    }
-
-    @PostMapping("/logout")
-    public ResponseEntity<?> logout() {
-        // Spring Security обрабатывает logout через LogoutFilter
-        return ResponseEntity.ok(Map.of("success", true));
+        AuthStateResponse response = authenticated
+                ? new AuthStateResponse(true, userInfo)
+                : new AuthStateResponse(false, userInfo);
+        HttpStatus status = authenticated ? HttpStatus.OK : HttpStatus.UNAUTHORIZED;
+        return ResponseEntity.status(status).body(new UniversalResponse<>(response));
     }
 }

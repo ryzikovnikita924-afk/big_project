@@ -43,9 +43,6 @@
         }
         .terrain-icon { font-size: 22px; }
     </style>
-    <!-- ИСПРАВЛЕННЫЕ ПУТИ - убрал /static -->
-    <script src="/js/auth.js" defer></script>
-    <script src="/js/game.js" defer></script>
 </head>
 <body class="min-h-screen bg-base-200">
 <div class="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-6">
@@ -61,7 +58,7 @@
             <div class="flex flex-col items-start gap-3 sm:items-end">
                 <div id="auth-state" class="badge badge-neutral badge-lg">Проверяем сессию...</div>
                 <div class="flex gap-3">
-                    <a id="login-link" class="btn btn-outline btn-primary" href="/oauth2/authorization/keycloak">🔐 Войти через Keycloak</a>
+                    <a id="login-link" class="btn btn-outline btn-primary" href="/oauth2/authorization/dex">🔐 Войти через Dex</a>
                     <button id="logout-button" class="btn btn-neutral hidden" type="button">🚪 Выйти</button>
                 </div>
             </div>
@@ -132,293 +129,397 @@
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", async () => {
-        const AuthApi = window.AuthApi;
-        const GameApi = window.GameApi;
-
-        const authStateBadge = document.getElementById("auth-state");
-        const logoutButton = document.getElementById("logout-button");
-        const loginLink = document.getElementById("login-link");
-        const startTurnBtn = document.getElementById("start-turn-btn");
-        const endTurnBtn = document.getElementById("end-turn-btn");
-        const attackPanel = document.getElementById("attack-panel");
-        const attackBtn = document.getElementById("attack-btn");
-        const troopsInput = document.getElementById("troops-input");
-
-        let selectedCell = null;
-        let mapData = null;
-        let myPlayerId = null;
-        let myPlayerName = null;
-        let gameState = {
-            canStartTurn: false,
-            canAttack: false,
-            gameState: 'WAITING',
-            currentTurnPlayer: null,
-            turn: 1
-        };
-
-        async function refreshAuthState() {
+    // Auth API
+    const AuthApi = {
+        async getCurrentUser() {
             try {
-                const {status, body} = await AuthApi.getCurrentUser();
-                const userInfo = body?.data?.userInfo ?? {};
-                const authenticated = status === 200 && body?.data?.authenticated;
+                const response = await fetch('/api/user/me', {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    return data;
+                }
+                return null;
+            } catch (error) {
+                console.error('Failed to get user:', error);
+                return null;
+            }
+        },
 
+        async logout() {
+            const response = await fetch('/api/user/logout', {
+                method: 'GET',
+                credentials: 'include'
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.redirect) {
+                    window.location.href = data.redirect;
+                }
+            }
+        },
+
+        showAlert(containerId, type, message) {
+            const container = document.getElementById(containerId);
+            if (!container) {
+                // Если контейнер не найден, показываем всплывающее уведомление
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `alert alert-${type === 'alert-error' ? 'error' : 'success'} fixed top-4 right-4 z-50 shadow-lg max-w-md`;
+                alertDiv.innerHTML = `
+                    <span>${message}</span>
+                    <button class="btn btn-sm btn-ghost" onclick="this.parentElement.remove()">✕</button>
+                `;
+                document.body.appendChild(alertDiv);
+                setTimeout(() => alertDiv.remove(), 5000);
+                return;
+            }
+
+            const alertClass = type === 'alert-error' ? 'alert-error' : 'alert-success';
+            container.innerHTML = `
+                <div class="alert ${alertClass} shadow-lg">
+                    <span>${message}</span>
+                </div>
+            `;
+            setTimeout(() => {
+                if (container.innerHTML === message) {
+                    container.innerHTML = "";
+                }
+            }, 5000);
+        },
+
+        extractDisplayName(userInfo) {
+            return userInfo?.username || userInfo?.email || userInfo?.name || 'User';
+        }
+    };
+
+    // Game API
+    const GameApi = {
+        async request(endpoint, options = {}) {
+            const response = await fetch(`/api/game${endpoint}`, {
+                ...options,
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    throw new Error('Unauthorized');
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            return await response.json();
+        },
+
+        getMap: () => GameApi.request('/map'),
+        getGameState: () => GameApi.request('/state'),
+        startTurn: () => GameApi.request('/turn/start', { method: 'POST' }),
+        endTurn: () => GameApi.request('/turn/end', { method: 'POST' }),
+        attack: (x, y, troops) => GameApi.request('/attack', {
+            method: 'POST',
+            body: JSON.stringify({ x, y, troops })
+        }),
+        getLeaderboard: () => GameApi.request('/leaderboard')
+    };
+
+    // Основная логика игры
+    let selectedCell = null;
+    let mapData = null;
+    let myPlayerId = null;
+    let myPlayerName = null;
+    let gameState = {
+        canStartTurn: false,
+        canAttack: false,
+        gameState: 'WAITING',
+        currentTurnPlayer: null,
+        turn: 1
+    };
+
+    async function refreshAuthState() {
+        try {
+            const userData = await AuthApi.getCurrentUser();
+            const authenticated = userData?.authenticated === true;
+
+            const authStateBadge = document.getElementById("auth-state");
+            const logoutButton = document.getElementById("logout-button");
+            const loginLink = document.getElementById("login-link");
+
+            if (authStateBadge) {
                 authStateBadge.className = authenticated
                     ? "badge badge-success badge-lg"
                     : "badge badge-warning badge-lg";
                 authStateBadge.textContent = authenticated
-                    ? `Вы вошли как ${AuthApi.extractDisplayName(userInfo)}`
-                    : "Гостевой режим";
+                    ? `Вы вошли как ${AuthApi.extractDisplayName(userData)}`
+                    : "Не авторизован";
+            }
 
-                if (loginLink) {
-                    if (authenticated) {
-                        loginLink.classList.add('hidden');
-                    } else {
-                        loginLink.classList.remove('hidden');
-                    }
-                }
+            if (loginLink) {
+                loginLink.classList.toggle("hidden", authenticated);
+            }
 
+            if (logoutButton) {
                 logoutButton.classList.toggle("hidden", !authenticated);
+            }
 
-                if (authenticated) {
-                    await loadMap();
-                    await checkGameState();
-                }
-            } catch (error) {
-                console.error('Auth error:', error);
+            if (authenticated) {
+                await loadMap();
+                await checkGameState();
+                await loadLeaderboard();
+            }
+        } catch (error) {
+            console.error('Auth error:', error);
+            const authStateBadge = document.getElementById("auth-state");
+            if (authStateBadge) {
                 authStateBadge.textContent = "Ошибка авторизации";
             }
         }
+    }
 
-        async function loadMap() {
-            try {
-                const {body} = await GameApi.getMap();
-                if (body) {
-                    mapData = body;
-                    if (!myPlayerId && mapData.players?.length > 0) {
-                        myPlayerId = mapData.players[0]?.id;
-                        myPlayerName = mapData.players[0]?.name;
-                    }
-                    renderMap();
-                    updatePlayersList();
+    async function loadMap() {
+        try {
+            const data = await GameApi.getMap();
+            if (data) {
+                mapData = data;
+                if (!myPlayerId && data.players?.length > 0) {
+                    myPlayerId = data.players[0]?.id;
+                    myPlayerName = data.players[0]?.name;
                 }
-            } catch (error) {
-                console.error('Load map error:', error);
+                renderMap();
+            }
+        } catch (error) {
+            console.error('Load map error:', error);
+        }
+    }
+
+    function renderMap() {
+        const mapDiv = document.getElementById('map');
+        if (!mapData || !mapDiv) return;
+
+        mapDiv.innerHTML = '';
+        for (let y = 0; y < 10; y++) {
+            for (let x = 0; x < 10; x++) {
+                const cell = mapData.cells?.find(c => c.x === x && c.y === y);
+                if (!cell) continue;
+
+                const cellDiv = document.createElement('div');
+                cellDiv.className = 'cell';
+                cellDiv.setAttribute('data-x', x);
+                cellDiv.setAttribute('data-y', y);
+
+                if (cell.water) cellDiv.classList.add('water');
+                else if (cell.owner === null) cellDiv.classList.add('neutral');
+                else if (cell.owner === myPlayerId) cellDiv.classList.add('player1');
+                else cellDiv.classList.add('player2');
+
+                let terrainIcon = '⬜';
+                switch(cell.terrain) {
+                    case 'FOREST': terrainIcon = '🌲'; break;
+                    case 'MOUNTAIN': terrainIcon = '⛰️'; break;
+                    case 'CITY': terrainIcon = '🏙️'; break;
+                    case 'WATER': terrainIcon = '💧'; break;
+                    default: terrainIcon = '🌾';
+                }
+
+                cellDiv.innerHTML = `
+                    <div class="terrain-icon">${terrainIcon}</div>
+                    <div class="troops">⚔️ ${cell.troops}</div>
+                `;
+                cellDiv.onclick = () => selectCell(cell);
+
+                if (selectedCell && selectedCell.x === x && selectedCell.y === y) {
+                    cellDiv.classList.add('selected');
+                }
+                mapDiv.appendChild(cellDiv);
             }
         }
+    }
 
-        function renderMap() {
-            const mapDiv = document.getElementById('map');
-            if (!mapData) return;
-
-            mapDiv.innerHTML = '';
-            for (let y = 0; y < 10; y++) {
-                for (let x = 0; x < 10; x++) {
-                    const cell = mapData.cells?.find(c => c.x === x && c.y === y);
-                    if (!cell) continue;
-
-                    const cellDiv = document.createElement('div');
-                    cellDiv.className = 'cell';
-                    cellDiv.setAttribute('data-x', x);
-                    cellDiv.setAttribute('data-y', y);
-
-                    if (cell.water) cellDiv.classList.add('water');
-                    else if (cell.owner === null) cellDiv.classList.add('neutral');
-                    else if (cell.owner === myPlayerId) cellDiv.classList.add('player1');
-                    else cellDiv.classList.add('player2');
-
-                    let terrainIcon = '⬜';
-                    switch(cell.terrain) {
-                        case 'FOREST': terrainIcon = '🌲'; break;
-                        case 'MOUNTAIN': terrainIcon = '⛰️'; break;
-                        case 'CITY': terrainIcon = '🏙️'; break;
-                        case 'WATER': terrainIcon = '💧'; break;
-                        default: terrainIcon = '🌾';
-                    }
-
-                    cellDiv.innerHTML = `
-                        <div class="terrain-icon">${terrainIcon}</div>
-                        <div class="troops">⚔️ ${cell.troops}</div>
-                    `;
-                    cellDiv.onclick = () => selectCell(cell);
-
-                    if (selectedCell && selectedCell.x === x && selectedCell.y === y) {
-                        cellDiv.classList.add('selected');
-                    }
-                    mapDiv.appendChild(cellDiv);
-                }
-            }
+    function selectCell(cell) {
+        if (!gameState.canAttack) {
+            AuthApi.showAlert('battle-log', 'alert-warning', 'Сначала начните ход!');
+            return;
         }
 
-        function selectCell(cell) {
-            if (!gameState.canAttack) {
-                AuthApi.showAlert('battle-log', 'alert-warning', 'Сначала начните ход!');
-                return;
-            }
+        selectedCell = cell;
+        renderMap();
 
-            selectedCell = cell;
-            renderMap();
+        const attackPanel = document.getElementById('attack-panel');
+        if (attackPanel) attackPanel.classList.remove('hidden');
 
-            attackPanel.classList.remove('hidden');
-
-            const myCells = mapData.cells?.filter(c => c.owner === myPlayerId && !c.water);
+        const troopsInput = document.getElementById('troops-input');
+        if (troopsInput) {
+            const myCells = mapData?.cells?.filter(c => c.owner === myPlayerId && !c.water);
             if (myCells?.length > 0) {
                 troopsInput.max = Math.min(20, myCells[0].troops);
                 troopsInput.min = 1;
                 troopsInput.value = Math.min(troopsInput.max, Math.floor(cell.troops / 2) || 1);
             }
         }
+    }
 
-        async function checkGameState() {
-            try {
-                const {body} = await GameApi.getGameState();
-                if (body) {
-                    gameState = body;
-                    myPlayerId = body.myPlayerId;
-                    myPlayerName = body.myPlayerName;
+    async function checkGameState() {
+        try {
+            const body = await GameApi.getGameState();
+            if (body) {
+                gameState = body;
 
-                    document.getElementById('turn-number').innerText = body.turn;
-                    document.getElementById('current-player').innerText = body.currentTurnPlayer || '-';
+                document.getElementById('turn-number').innerText = body.turn || 1;
+                document.getElementById('current-player').innerText = body.currentTurnPlayer || '-';
 
-                    if (body.winner) {
-                        document.getElementById('turn-status').innerHTML = `🏆 ПОБЕДИТЕЛЬ: ${body.winner}! 🏆`;
-                        return;
-                    }
+                const startTurnBtn = document.getElementById('start-turn-btn');
+                const endTurnBtn = document.getElementById('end-turn-btn');
+                const turnStatus = document.getElementById('turn-status');
 
-                    if (body.canAttack) {
-                        startTurnBtn.classList.add('hidden');
-                        endTurnBtn.classList.remove('hidden');
-                        document.getElementById('turn-status').innerHTML = `🎲 ВАШ ХОД! Действуйте! (${myPlayerName})`;
-                    } else if (body.canStartTurn) {
-                        startTurnBtn.classList.remove('hidden');
-                        endTurnBtn.classList.add('hidden');
-                        document.getElementById('turn-status').innerHTML = `🎯 ВАШ ХОД! Нажмите "Начать ход" (${myPlayerName})`;
-                    } else {
-                        startTurnBtn.classList.add('hidden');
-                        endTurnBtn.classList.add('hidden');
-                        document.getElementById('turn-status').innerHTML = `⏳ Ожидание хода: ${body.currentTurnPlayer || 'противника'}`;
-                    }
-
-                    updateResources(body);
+                if (body.winner) {
+                    if (turnStatus) turnStatus.innerHTML = `🏆 ПОБЕДИТЕЛЬ: ${body.winner}! 🏆`;
+                    return;
                 }
-            } catch (error) {
-                console.error('Check game state error:', error);
+
+                if (body.canAttack) {
+                    if (startTurnBtn) startTurnBtn.classList.add('hidden');
+                    if (endTurnBtn) endTurnBtn.classList.remove('hidden');
+                    if (turnStatus) turnStatus.innerHTML = `🎲 ВАШ ХОД! Действуйте! (${myPlayerName})`;
+                } else if (body.canStartTurn) {
+                    if (startTurnBtn) startTurnBtn.classList.remove('hidden');
+                    if (endTurnBtn) endTurnBtn.classList.add('hidden');
+                    if (turnStatus) turnStatus.innerHTML = `🎯 ВАШ ХОД! Нажмите "Начать ход" (${myPlayerName})`;
+                } else {
+                    if (startTurnBtn) startTurnBtn.classList.add('hidden');
+                    if (endTurnBtn) endTurnBtn.classList.add('hidden');
+                    if (turnStatus) turnStatus.innerHTML = `⏳ Ожидание хода: ${body.currentTurnPlayer || 'противника'}`;
+                }
+
+                updateResources(body);
+            }
+        } catch (error) {
+            console.error('Check game state error:', error);
+        }
+    }
+
+    function updateResources(state) {
+        if (state) {
+            const elements = {
+                gold: state.myGold,
+                wood: state.myWood,
+                food: state.myFood,
+                'total-troops': state.myTroops
+            };
+
+            for (const [id, value] of Object.entries(elements)) {
+                const el = document.getElementById(id);
+                if (el) el.innerText = value || 0;
             }
         }
+    }
 
-        function updateResources(state) {
-            if (state) {
-                document.getElementById('gold').innerText = state.myGold || 0;
-                document.getElementById('wood').innerText = state.myWood || 0;
-                document.getElementById('food').innerText = state.myFood || 0;
-                document.getElementById('total-troops').innerText = state.myTroops || 0;
-            }
-        }
-
-        function updatePlayersList() {
-            const playersDiv = document.getElementById('players-list');
-            if (!playersDiv) return;
-
-            if (!mapData?.players?.length) {
-                playersDiv.innerHTML = '<div>Нет игроков</div>';
-                return;
-            }
-
-            playersDiv.innerHTML = mapData.players.map(player => `
-                <div class="flex justify-between items-center py-2 border-b border-base-300">
-                    <div>
-                        <span class="badge ${player.id === myPlayerId ? 'badge-success' : 'badge-neutral'} mr-2"></span>
-                        <span>${player.name} ${player.id === myPlayerId ? '(Вы)' : ''}</span>
-                    </div>
-                    <div class="text-sm">
-                        <span>🏠 ${player.cellsCount} | 🏆 ${player.victories}</span>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        async function loadLeaderboard() {
-            try {
-                const {body} = await GameApi.getLeaderboard();
-                if (body && Array.isArray(body)) {
-                    const container = document.getElementById('leaderboard-list');
-                    container.innerHTML = body.map((player, idx) => `
+    async function loadLeaderboard() {
+        try {
+            const data = await GameApi.getLeaderboard();
+            if (data && Array.isArray(data)) {
+                const container = document.getElementById('leaderboard-list');
+                if (container) {
+                    container.innerHTML = data.map((player, idx) => `
                         <div class="flex justify-between items-center">
                             <span class="${idx < 3 ? 'font-bold text-primary' : ''}">${idx + 1}. ${player.name}</span>
-                            <span>🏆 ${player.totalWins} побед</span>
+                            <span>🏆 ${player.totalWins || 0} побед</span>
                         </div>
                     `).join('');
                 }
-            } catch (error) {
-                console.error('Load leaderboard error:', error);
             }
+        } catch (error) {
+            console.error('Load leaderboard error:', error);
+        }
+    }
+
+    function addBattleLog(message) {
+        const logDiv = document.getElementById('battle-log');
+        if (!logDiv) return;
+
+        const entry = document.createElement('div');
+        entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logDiv.insertBefore(entry, logDiv.firstChild);
+
+        // Ограничиваем количество записей
+        while (logDiv.children.length > 50) {
+            logDiv.removeChild(logDiv.lastChild);
+        }
+    }
+
+    // Инициализация
+    document.addEventListener('DOMContentLoaded', async () => {
+        const startTurnBtn = document.getElementById('start-turn-btn');
+        const endTurnBtn = document.getElementById('end-turn-btn');
+        const attackBtn = document.getElementById('attack-btn');
+        const troopsInput = document.getElementById('troops-input');
+        const logoutButton = document.getElementById('logout-button');
+
+        if (startTurnBtn) {
+            startTurnBtn.onclick = async () => {
+                const body = await GameApi.startTurn();
+                if (body?.success) {
+                    addBattleLog('🎮 Начат новый ход! Получены ресурсы.');
+                    await checkGameState();
+                    await loadMap();
+                } else {
+                    AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Не удалось начать ход');
+                }
+            };
         }
 
-        function addBattleLog(message) {
-            const logDiv = document.getElementById('battle-log');
-            const entry = document.createElement('div');
-            entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
-            logDiv.insertBefore(entry, logDiv.firstChild);
+        if (endTurnBtn) {
+            endTurnBtn.onclick = async () => {
+                const body = await GameApi.endTurn();
+                if (body?.success) {
+                    addBattleLog('✅ Ход завершен!');
+                    selectedCell = null;
+                    const attackPanel = document.getElementById('attack-panel');
+                    if (attackPanel) attackPanel.classList.add('hidden');
+                    await checkGameState();
+                    await loadMap();
+                } else {
+                    AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Не удалось завершить ход');
+                }
+            };
         }
 
-        startTurnBtn.onclick = async () => {
-            const {body} = await GameApi.startTurn();
-            if (body?.success) {
-                addBattleLog('🎮 Начат новый ход! Получены ресурсы.');
-                await checkGameState();
-                await loadMap();
-            } else {
-                AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Не удалось начать ход');
-            }
-        };
+        if (attackBtn && troopsInput) {
+            attackBtn.onclick = async () => {
+                if (!selectedCell) {
+                    AuthApi.showAlert('battle-log', 'alert-warning', 'Выберите клетку для атаки!');
+                    return;
+                }
 
-        endTurnBtn.onclick = async () => {
-            const {body} = await GameApi.endTurn();
-            if (body?.success) {
-                addBattleLog('✅ Ход завершен!');
-                selectedCell = null;
-                attackPanel.classList.add('hidden');
-                await checkGameState();
-                await loadMap();
-            } else {
-                AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Не удалось завершить ход');
-            }
-        };
+                const troops = troopsInput.value;
+                if (!troops || troops < 1) {
+                    AuthApi.showAlert('battle-log', 'alert-warning', 'Введите количество войск!');
+                    return;
+                }
 
-        attackBtn.onclick = async () => {
-            if (!selectedCell) {
-                AuthApi.showAlert('battle-log', 'alert-warning', 'Выберите клетку для атаки!');
-                return;
-            }
+                const body = await GameApi.attack(selectedCell.x, selectedCell.y, parseInt(troops));
+                if (body?.status === 'ok') {
+                    addBattleLog(`⚔️ Атака на клетку [${selectedCell.x},${selectedCell.y}] с ${troops} войсками!`);
+                    await loadMap();
+                    await checkGameState();
+                } else {
+                    AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Ошибка атаки');
+                }
+            };
+        }
 
-            const troops = troopsInput.value;
-            if (!troops || troops < 1) {
-                AuthApi.showAlert('battle-log', 'alert-warning', 'Введите количество войск!');
-                return;
-            }
+        if (logoutButton) {
+            logoutButton.addEventListener("click", async () => {
+                await AuthApi.logout();
+            });
+        }
 
-            const {body} = await GameApi.attack(selectedCell.x, selectedCell.y, parseInt(troops));
-            if (body?.status === 'ok') {
-                addBattleLog(`⚔️ Атака на клетку [${selectedCell.x},${selectedCell.y}] с ${troops} войсками!`);
-                await loadMap();
-                await checkGameState();
-            } else {
-                AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Ошибка атаки');
-            }
-        };
-
-        logoutButton.addEventListener("click", async () => {
-            await AuthApi.logout();
-            AuthApi.showAlert("battle-log", "alert-success", "Сессия завершена");
-            setTimeout(() => {
-                window.location.href = "/login.html";
-            }, 500);
-        });
-
-        await AuthApi.ensureCsrfCookie();
         await refreshAuthState();
-        await loadLeaderboard();
 
+        // Периодическое обновление
         setInterval(() => {
             if (!gameState.canAttack && !gameState.canStartTurn) {
                 loadMap();

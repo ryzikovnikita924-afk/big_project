@@ -3,75 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход через Keycloak - GeoStrat</title>
+    <title>GeoStrat - Вход</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css"/>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css"/>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- ИСПРАВЛЕНО: убрал /static из пути -->
-    <script src="/js/auth.js" defer></script>
+    <style>
+        .bg-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
 </head>
-<body class="min-h-screen bg-base-200">
-<div class="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-4 py-8">
-    <div class="flex items-center justify-between">
-        <div>
-            <p class="text-sm uppercase tracking-[0.3em] text-primary">GeoStrat</p>
-            <h1 class="text-4xl font-black">Вход через Keycloak</h1>
+<body class="bg-gradient min-h-screen">
+<div class="hero min-h-screen">
+    <div class="hero-content flex-col lg:flex-row-reverse gap-12">
+        <div class="text-center lg:text-left">
+            <h1 class="text-5xl font-bold text-white mb-4">GeoStrat</h1>
+            <p class="text-xl text-white/90">Клеточная стратегия</p>
+            <p class="text-md text-white/70 mt-4 max-w-md">
+                Пошаговая PvP стратегия с экономикой и тактическими сражениями
+            </p>
+            <div class="mt-8 p-4 bg-white/10 rounded-lg backdrop-blur-sm">
+                <p class="text-sm text-white/80">📋 Тестовые данные для входа:</p>
+                <code class="text-xs text-white/90 block mt-2">
+                    student@example.com / password
+                </code>
+            </div>
         </div>
-        <a class="btn btn-outline" href="/">К игре</a>
+
+        <div class="card w-full max-w-md bg-base-100 shadow-2xl">
+            <div class="card-body">
+                <div class="text-center">
+                    <h2 class="text-3xl font-bold">Добро пожаловать!</h2>
+                    <p class="text-base-content/70 mt-2">Войдите через Dex</p>
+                </div>
+
+                <div id="alert-container"></div>
+
+                <div class="form-control mt-4">
+                    <button id="login-dex-btn" class="btn btn-primary btn-block gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                        </svg>
+                        Войти через Dex (OIDC)
+                    </button>
+                </div>
+
+                <div class="divider">или</div>
+
+                <div class="form-control">
+                    <button id="login-guest-btn" class="btn btn-outline btn-block">
+                        Продолжить как гость
+                    </button>
+                </div>
+
+                <div class="mt-6 text-center text-sm text-base-content/60">
+                    <p>🔐 Безопасная аутентификация через Dex</p>
+                    <p class="mt-1">📱 После входа вы будете перенаправлены в игру</p>
+                </div>
+            </div>
+        </div>
     </div>
-
-    <div id="page-alert"></div>
-
-    <section class="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <article class="card bg-base-100 shadow-sm">
-            <div class="card-body">
-                <h2 class="card-title">Логин через Keycloak</h2>
-                <p class="text-sm text-base-content/70">
-                    Приложение перенаправит вас на страницу входа Keycloak.
-                    После успешной аутентификации вы вернетесь в игру.
-                </p>
-                <a href="/oauth2/authorization/keycloak" class="btn btn-primary w-full sm:w-auto">
-                    🔐 Войти через Keycloak
-                </a>
-            </div>
-        </article>
-
-        <article class="card bg-base-100 shadow-sm">
-            <div class="card-body">
-                <h2 class="card-title">Игровая сессия</h2>
-                <p class="text-sm text-base-content/70">После входа вы сможете:</p>
-                <ul class="list-disc pl-5 text-sm space-y-1">
-                    <li>Играть в клеточную стратегию</li>
-                    <li>Атаковать клетки противника</li>
-                    <li>Сохранять статистику побед</li>
-                    <li>Участвовать в таблице лидеров</li>
-                </ul>
-            </div>
-        </article>
-    </section>
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        const AuthApi = window.AuthApi;
-        const searchParams = new URLSearchParams(window.location.search);
+    // Определяем базовый URL в зависимости от окружения
+    const getBaseUrl = () => {
+        // Если мы на порту 4180 - используем относительные пути
+        if (window.location.port === '4180') {
+            return '';
+        }
+        // Если на 8080 - используем OAuth2 Proxy для аутентификации
+        return 'http://localhost:4180';
+    };
 
-        // Проверяем параметры ошибки
-        if (searchParams.has("error")) {
-            AuthApi.showAlert("page-alert", "alert-error", "Не удалось выполнить вход через Keycloak");
-        } else if (searchParams.has("logout")) {
-            AuthApi.showAlert("page-alert", "alert-success", "Вы вышли из приложения");
+    const AuthApi = (() => {
+        const CSRF_COOKIE_NAME = "XSRF-TOKEN";
+        const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
+
+        function readCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
         }
 
-
-        AuthApi.getCurrentUser().then(({status, body}) => {
-            if (status === 200 && body?.data?.authenticated) {
-                AuthApi.showAlert("page-alert", "alert-success", "Вы уже авторизованы! Перенаправление в игру...");
-                setTimeout(() => {
-                    window.location.href = "/";
-                }, 2000);
+        async function ensureCsrfCookie() {
+            if (readCookie(CSRF_COOKIE_NAME)) return;
+            try {
+                await fetch("/api/auth/me", { credentials: "include" });
+            } catch (error) {
+                console.log("CSRF cookie not set");
             }
-        });
+        }
+
+        function showAlert(message, type = "error") {
+            const container = document.getElementById("alert-container");
+            if (!container) return;
+
+            const alertClass = type === "error" ? "alert-error" : "alert-success";
+            container.innerHTML = `
+                <div class="alert ${alertClass} shadow-lg">
+                    <span>${message}</span>
+                </div>
+            `;
+
+            setTimeout(() => {
+                container.innerHTML = "";
+            }, 5000);
+        }
+
+        async function checkAuthAndRedirect() {
+            try {
+                await ensureCsrfCookie();
+                const response = await fetch("/api/auth/me", {
+                    credentials: "include"
+                });
+                const data = await response.json();
+
+                if (data?.data?.authenticated) {
+                    // Если уже авторизован - перенаправляем в игру
+                    window.location.href = "/";
+                }
+            } catch (error) {
+                console.log("Not authenticated");
+            }
+        }
+
+        return {
+            ensureCsrfCookie,
+            showAlert,
+            login: () => {
+                // Перенаправление на Spring OAuth2 login
+                window.location.href = "/oauth2/authorization/dex";
+            },
+            loginAsGuest: async () => {
+                try {
+                    await ensureCsrfCookie();
+                    const response = await fetch("/api/auth/guest", {
+                        method: "POST",
+                        credentials: "include",
+                        headers: {
+                            "Content-Type": "application/json"
+                        }
+                    });
+
+                    if (response.ok) {
+                        window.location.href = "/";
+                    } else {
+                        showAlert("Не удалось войти как гость", "error");
+                    }
+                } catch (error) {
+                    showAlert("Ошибка при входе как гость", "error");
+                }
+            },
+            checkAuthAndRedirect
+        };
+    })();
+
+    // Обработчики событий
+    document.addEventListener("DOMContentLoaded", async () => {
+        const loginDexBtn = document.getElementById("login-dex-btn");
+        const loginGuestBtn = document.getElementById("login-guest-btn");
+
+        // Проверяем параметры URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const error = urlParams.get("error");
+        const logout = urlParams.get("logout");
+
+        if (error) {
+            AuthApi.showAlert("Ошибка аутентификации. Пожалуйста, попробуйте снова.", "error");
+        } else if (logout) {
+            AuthApi.showAlert("Вы успешно вышли из системы", "success");
+        }
+
+        // Кнопка входа через Dex
+        if (loginDexBtn) {
+            loginDexBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                AuthApi.login();
+            });
+        }
+
+        // Кнопка гостевого входа
+        if (loginGuestBtn) {
+            loginGuestBtn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                await AuthApi.loginAsGuest();
+            });
+        }
+
+        // Проверка авторизации
+        await AuthApi.checkAuthAndRedirect();
     });
 </script>
 </body>
