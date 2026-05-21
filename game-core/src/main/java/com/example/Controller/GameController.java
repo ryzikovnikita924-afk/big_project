@@ -9,8 +9,6 @@ import com.example.model.Player;
 import com.example.model.Cell;
 import com.example.model.ResourceType;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -52,29 +50,22 @@ public class GameController {
         }
 
         gameWorld.createWorld(10, 10);
-
-
         gameWorld.start();
         gameInitialized = true;
         System.out.println("✅ Игровой мир создан!");
     }
 
-
     public void addPlayerToGame(String playerId, String playerName) {
-
         if (gameWorld.getPlayer(playerId) != null) {
             System.out.println("Игрок " + playerName + " уже в игре");
             return;
         }
 
-
         Player gamePlayer = new Player(playerName);
         gamePlayer.setId(playerId);
 
-
         int startX = 2, startY = 2;
         if (!gameWorld.getPlayers().isEmpty()) {
-            // Если есть другие игроки, ставим нового на противоположную сторону
             startX = 7;
             startY = 7;
         }
@@ -86,22 +77,21 @@ public class GameController {
         }
         allPlayers.add(gamePlayer);
 
-
         if (allPlayers.size() == 1) {
             turnService.initialize(allPlayers);
             currentPlayerId = gamePlayer.getId();
         } else {
-
             turnService.updatePlayers(allPlayers);
         }
 
         System.out.println("✅ Игрок " + playerName + " добавлен в игру");
     }
 
-    @GetMapping("/")
-    public String index(Model model) {
-        return "index";
-    }
+    // !!! ЗАКОММЕНТИРУЙТЕ ИЛИ УДАЛИТЕ ЭТОТ МЕТОД !!!
+    // @GetMapping("/")
+    // public String index(Model model) {
+    //     return "index";
+    // }
 
     @GetMapping("/api/players")
     @ResponseBody
@@ -187,6 +177,7 @@ public class GameController {
 
         return result;
     }
+
     @GetMapping("/api/auth/check")
     @ResponseBody
     public Map<String, Object> checkAuth(HttpServletRequest request) {
@@ -228,14 +219,12 @@ public class GameController {
             return Map.of("status", "error", "message", "У вас нет клеток для атаки!");
         }
 
-
         String toId = request.toX + ":" + request.toY;
         Cell toCell = gameWorld.getCell(toId);
 
         if (toCell == null) {
             return Map.of("status", "error", "message", "Клетка не найдена!");
         }
-
 
         try {
             gameWorld.executeInstantAttack(playerCells, toCell, currentPlayerId);

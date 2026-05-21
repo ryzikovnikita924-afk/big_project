@@ -5,6 +5,7 @@ import com.example.service.PlayerSyncService;
 import com.example.service.CurrentUserService;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -22,31 +23,40 @@ public class UserController {
 
     @GetMapping("/me")
     public Map<String, Object> getCurrentUser() {
+        Map<String, Object> response = new HashMap<>();
 
         String authId = currentUserService.getAuthId();
         if (authId == null) {
-            return Map.of("authenticated", false);
+            response.put("authenticated", false);
+            return response;
         }
 
-        PlayerEntity player = playerSyncService.sync();
+        try {
+            PlayerEntity player = playerSyncService.sync();
 
-        return Map.of(
-                "authenticated", true,
-                "id", player.getId(),
-                "email", player.getEmail(),
-                "username", player.getName(),
-                "firstName", player.getFirstName(),
-                "lastName", player.getLastName(),
-                "avatarUrl", player.getAvatarUrl(),
-                "totalGames", player.getTotalGames(),
-                "totalWins", player.getTotalWins(),
-                "totalScore", player.getTotalScore()
-        );
+            response.put("authenticated", true);
+            response.put("id", player.getId());
+            response.put("email", player.getEmail() != null ? player.getEmail() : "");
+            response.put("username", player.getName() != null ? player.getName() : "");
+            response.put("name", player.getName() != null ? player.getName() : "");
+            response.put("firstName", player.getFirstName() != null ? player.getFirstName() : "");
+            response.put("lastName", player.getLastName() != null ? player.getLastName() : "");
+            response.put("avatarUrl", player.getAvatarUrl() != null ? player.getAvatarUrl() : "");
+            response.put("totalGames", player.getTotalGames());
+            response.put("totalWins", player.getTotalWins());
+            response.put("totalScore", player.getTotalScore());
+
+        } catch (Exception e) {
+            response.put("authenticated", false);
+            response.put("error", e.getMessage());
+        }
+
+        return response;
     }
 
     @GetMapping("/login")
     public Map<String, String> login() {
-        return Map.of("redirect", "/oauth2/start"); // отдаёт oauth2-proxy
+        return Map.of("redirect", "/oauth2/start");
     }
 
     @GetMapping("/logout")

@@ -7,58 +7,66 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css"/>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css"/>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="/js/auth.js"></script>
     <style>
-        .bg-gradient {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .bg-gradient { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .loader {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .loader-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body class="bg-gradient min-h-screen">
-<div class="hero min-h-screen">
-    <div class="hero-content flex-col lg:flex-row-reverse gap-12">
-        <div class="text-center lg:text-left">
-            <h1 class="text-5xl font-bold text-white mb-4">GeoStrat</h1>
-            <p class="text-xl text-white/90">Клеточная стратегия</p>
-            <p class="text-md text-white/70 mt-4 max-w-md">
-                Пошаговая PvP стратегия с экономикой и тактическими сражениями
-            </p>
-            <div class="mt-8 p-4 bg-white/10 rounded-lg backdrop-blur-sm">
-                <p class="text-sm text-white/80">📋 Тестовые данные для входа:</p>
-                <code class="text-xs text-white/90 block mt-2">
-                    student@example.com / password
-                </code>
+<body>
+<div id="loader" class="loader">
+    <div class="loader-spinner"></div>
+</div>
+
+<div id="main-content" class="bg-gradient min-h-screen" style="display: none;">
+    <div class="hero min-h-screen">
+        <div class="hero-content flex-col lg:flex-row-reverse gap-12">
+            <div class="text-center lg:text-left">
+                <h1 class="text-5xl font-bold text-white mb-4">GeoStrat</h1>
+                <p class="text-xl text-white/90">Клеточная стратегия</p>
+                <p class="text-md text-white/70 mt-4 max-w-md">Пошаговая PvP стратегия с экономикой и тактическими сражениями</p>
             </div>
-        </div>
 
-        <div class="card w-full max-w-md bg-base-100 shadow-2xl">
-            <div class="card-body">
-                <div class="text-center">
-                    <h2 class="text-3xl font-bold">Добро пожаловать!</h2>
-                    <p class="text-base-content/70 mt-2">Войдите через Dex</p>
-                </div>
+            <div class="card w-full max-w-md bg-base-100 shadow-2xl">
+                <div class="card-body">
+                    <div class="text-center">
+                        <h2 class="text-3xl font-bold">Добро пожаловать!</h2>
+                        <p class="text-base-content/70 mt-2">Войдите через Keycloak</p>
+                    </div>
 
-                <div id="alert-container"></div>
+                    <div id="page-alert"></div>
 
-                <div class="form-control mt-4">
-                    <button id="login-dex-btn" class="btn btn-primary btn-block gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-                        </svg>
-                        Войти через Dex (OIDC)
-                    </button>
-                </div>
+                    <div class="form-control mt-4">
+                        <button id="login-button" class="btn btn-primary btn-block gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                            </svg>
+                            Войти через Keycloak
+                        </button>
+                    </div>
 
-                <div class="divider">или</div>
+                    <div class="divider">или</div>
 
-                <div class="form-control">
-                    <button id="login-guest-btn" class="btn btn-outline btn-block">
-                        Продолжить как гость
-                    </button>
-                </div>
-
-                <div class="mt-6 text-center text-sm text-base-content/60">
-                    <p>🔐 Безопасная аутентификация через Dex</p>
-                    <p class="mt-1">📱 После входа вы будете перенаправлены в игру</p>
+                    <div class="form-control">
+                        <button id="guest-button" class="btn btn-outline btn-block">Продолжить как гость</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -66,135 +74,61 @@
 </div>
 
 <script>
-    // Определяем базовый URL в зависимости от окружения
-    const getBaseUrl = () => {
-        // Если мы на порту 4180 - используем относительные пути
-        if (window.location.port === '4180') {
-            return '';
-        }
-        // Если на 8080 - используем OAuth2 Proxy для аутентификации
-        return 'http://localhost:4180';
-    };
+    (async function() {
+        const AuthApi = window.AuthApi;
+        const loader = document.getElementById("loader");
+        const mainContent = document.getElementById("main-content");
+        const loginButton = document.getElementById("login-button");
+        const guestButton = document.getElementById("guest-button");
+        const searchParams = new URLSearchParams(window.location.search);
 
-    const AuthApi = (() => {
-        const CSRF_COOKIE_NAME = "XSRF-TOKEN";
-        const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
-
-        function readCookie(name) {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop().split(';').shift();
-            return null;
-        }
-
-        async function ensureCsrfCookie() {
-            if (readCookie(CSRF_COOKIE_NAME)) return;
-            try {
-                await fetch("/api/auth/me", { credentials: "include" });
-            } catch (error) {
-                console.log("CSRF cookie not set");
+        // Проверяем авторизацию
+        try {
+            const { status, body } = await AuthApi.getCurrentUser();
+            if (status === 200 && body?.authenticated) {
+                // Уже авторизован - сразу в игру
+                window.location.href = "/";
+                return;
             }
+        } catch (error) {
+            console.error("Auth check error:", error);
         }
 
-        function showAlert(message, type = "error") {
-            const container = document.getElementById("alert-container");
-            if (!container) return;
+        // Показываем страницу входа
+        loader.style.display = "none";
+        mainContent.style.display = "block";
 
-            const alertClass = type === "error" ? "alert-error" : "alert-success";
-            container.innerHTML = `
-                <div class="alert ${alertClass} shadow-lg">
-                    <span>${message}</span>
-                </div>
-            `;
-
-            setTimeout(() => {
-                container.innerHTML = "";
-            }, 5000);
+        // Показываем сообщения
+        if (searchParams.has("error")) {
+            AuthApi.showAlert("page-alert", "alert-error", "Не удалось выполнить вход");
+        } else if (searchParams.has("logout")) {
+            AuthApi.showAlert("page-alert", "alert-success", "Вы вышли из системы");
         }
 
-        async function checkAuthAndRedirect() {
-            try {
-                await ensureCsrfCookie();
-                const response = await fetch("/api/auth/me", {
-                    credentials: "include"
-                });
-                const data = await response.json();
-
-                if (data?.data?.authenticated) {
-                    // Если уже авторизован - перенаправляем в игру
-                    window.location.href = "/";
-                }
-            } catch (error) {
-                console.log("Not authenticated");
-            }
-        }
-
-        return {
-            ensureCsrfCookie,
-            showAlert,
-            login: () => {
-                // Перенаправление на Spring OAuth2 login
-                window.location.href = "/oauth2/authorization/dex";
-            },
-            loginAsGuest: async () => {
-                try {
-                    await ensureCsrfCookie();
-                    const response = await fetch("/api/auth/guest", {
-                        method: "POST",
-                        credentials: "include",
-                        headers: {
-                            "Content-Type": "application/json"
-                        }
-                    });
-
-                    if (response.ok) {
-                        window.location.href = "/";
-                    } else {
-                        showAlert("Не удалось войти как гость", "error");
-                    }
-                } catch (error) {
-                    showAlert("Ошибка при входе как гость", "error");
-                }
-            },
-            checkAuthAndRedirect
-        };
-    })();
-
-    // Обработчики событий
-    document.addEventListener("DOMContentLoaded", async () => {
-        const loginDexBtn = document.getElementById("login-dex-btn");
-        const loginGuestBtn = document.getElementById("login-guest-btn");
-
-        // Проверяем параметры URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const error = urlParams.get("error");
-        const logout = urlParams.get("logout");
-
-        if (error) {
-            AuthApi.showAlert("Ошибка аутентификации. Пожалуйста, попробуйте снова.", "error");
-        } else if (logout) {
-            AuthApi.showAlert("Вы успешно вышли из системы", "success");
-        }
-
-        // Кнопка входа через Dex
-        if (loginDexBtn) {
-            loginDexBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                AuthApi.login();
-            });
-        }
+        // Кнопка входа через Keycloak
+        loginButton?.addEventListener("click", () => {
+            // Перенаправляем на oauth2-proxy, который пойдёт в Keycloak
+            window.location.href = "/oauth2/start?rd=/";
+        });
 
         // Кнопка гостевого входа
-        if (loginGuestBtn) {
-            loginGuestBtn.addEventListener("click", async (e) => {
-                e.preventDefault();
-                await AuthApi.loginAsGuest();
-            });
-        }
-
-        // Проверка авторизации
-        await AuthApi.checkAuthAndRedirect();
-    });
+        guestButton?.addEventListener("click", async () => {
+            try {
+                const response = await fetch("/api/auth/guest", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" }
+                });
+                if (response.ok) {
+                    window.location.href = "/";
+                } else {
+                    AuthApi.showAlert("page-alert", "alert-error", "Не удалось войти как гость");
+                }
+            } catch (error) {
+                AuthApi.showAlert("page-alert", "alert-error", "Ошибка при входе как гость");
+            }
+        });
+    })();
 </script>
 </body>
 </html>

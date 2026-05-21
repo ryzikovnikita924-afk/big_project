@@ -2,13 +2,11 @@ package com.example.Controller;
 
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 public class APIController {
-
 
     @GetMapping("/api/game/map")
     public ResponseEntity<Map<String, Object>> getMap() {

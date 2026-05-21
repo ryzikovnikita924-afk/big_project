@@ -1,56 +1,60 @@
 provider = "oidc"
 http_address = "0.0.0.0:4180"
+
+client_id = "oauth2-proxy"
+client_secret = "c6Qk9CKH2XhLYhmsYUpN9P63nfZJ5OSd"
 redirect_url = "http://localhost:4180/oauth2/callback"
+oidc_issuer_url = "http://localhost:8082/realms/geostrat"
 
-# Zitadel конфигурация
-client_id = "YOUR_CLIENT_ID_FROM_ZITADEL"
-client_secret = "YOUR_CLIENT_SECRET_FROM_ZITADEL"
-oidc_issuer_url = "http://zitadel:8080"
+skip_oidc_discovery = true
+insecure_oidc_allow_unverified_email = true
+insecure_oidc_skip_issuer_verification = true
+login_url = "http://localhost:8082/realms/geostrat/protocol/openid-connect/auth"
 
-# Автоматическое обнаружение
-skip_oidc_discovery = false
-
-scope = "openid profile email urn:zitadel:iam:org:project:roles"
+redeem_url = "http://host.docker.internal:8082/realms/geostrat/protocol/openid-connect/token"
+oidc_jwks_url = "http://host.docker.internal:8082/realms/geostrat/protocol/openid-connect/certs"
+profile_url = "http://host.docker.internal:8082/realms/geostrat/protocol/openid-connect/userinfo"
+scope = "openid profile email"
 email_domains = ["*"]
 skip_provider_button = true
 
-# Upstream
 upstreams = [
-    "http://game-core:8080/"
+    "http://host.docker.internal:8080/"
 ]
 
-# Публичные маршруты
+
+api_routes = [
+    "^/api/"
+]
+
 skip_auth_routes = [
-    "^/$",
-    "^/index\\.html$",
+    "^/login$",
     "^/login\\.html$",
-    "^/css/",
-    "^/js/",
-    "^/images/",
-    "^/api/user/me$",
-    "^/api/user/login$",
-    "^/api/map$",
-    "^/api/players$",
-    "^/api/game-state$"
+    "^/auth\\.js$",
+    "^/css/.*$",
+    "^/js/.*$",
+    "^/api/auth/me$"
 ]
 
-# Сессии
-session_store_type = "cookie"
-cookie_name = "_oauth2_proxy_geostrat"
+session_store_type = "redis"
+redis_connection_url = "redis://:redis123@host.docker.internal:6379"
+
+pass_user_headers = true
+pass_basic_auth = false
+pass_access_token = false
+pass_authorization_header = false
+set_authorization_header = false
+set_xauthrequest = false
+
+cookie_name = "_oauth2_proxy_jbcd"
 cookie_secret = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
 cookie_secure = false
 cookie_httponly = true
 cookie_samesite = "lax"
+cookie_csrf_expire = "15m"
+cookie_csrf_per_request = true
+cookie_csrf_samesite = "lax"
 
-# Проксирование
-pass_user_headers = true
-pass_access_token = true
-set_xauthrequest = true
-
-# Домены
 whitelist_domains = [
-    "localhost",
     "localhost:4180"
 ]
-
-insecure_oidc_allow_unverified_email = true

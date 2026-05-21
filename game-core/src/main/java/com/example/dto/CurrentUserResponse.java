@@ -1,8 +1,8 @@
-package com.example.dto.auth;
+package com.example.dto;
 
 import java.util.Map;
 
-public record AuthStateResponse(
+public record CurrentUserResponse(
         boolean authenticated,
         Map<String, Object> userInfo
 ) {

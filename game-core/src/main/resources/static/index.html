@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css"/>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css"/>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="/js/auth.js"></script>
     <style>
         .cell {
             width: 65px;
@@ -42,492 +43,527 @@
             margin-top: 4px;
         }
         .terrain-icon { font-size: 22px; }
+
+        /* Стили для лоадера */
+        .loader {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .loader-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="min-h-screen bg-base-200">
-<div class="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-6">
-    <header class="hero rounded-box bg-base-100 shadow-sm">
-        <div class="hero-content w-full flex-col items-start gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-                <p class="text-sm uppercase tracking-[0.3em] text-primary">GeoStrat</p>
-                <h1 class="text-4xl font-black">Клеточная стратегия</h1>
-                <p class="max-w-2xl text-base-content/70">
-                    Пошаговая стратегия | PvP | Экономика
-                </p>
-            </div>
-            <div class="flex flex-col items-start gap-3 sm:items-end">
-                <div id="auth-state" class="badge badge-neutral badge-lg">Проверяем сессию...</div>
-                <div class="flex gap-3">
-                    <a id="login-link" class="btn btn-outline btn-primary" href="/oauth2/authorization/dex">🔐 Войти через Dex</a>
-                    <button id="logout-button" class="btn btn-neutral hidden" type="button">🚪 Выйти</button>
+<!-- Лоадер, пока проверяем авторизацию -->
+<div id="loader" class="loader">
+    <div class="loader-spinner"></div>
+</div>
+
+<!-- Основной контент (скрыт пока не проверим авторизацию) -->
+<div id="main-content" style="display: none;">
+    <div class="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-6">
+        <header class="hero rounded-box bg-base-100 shadow-sm">
+            <div class="hero-content w-full flex-col items-start gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <p class="text-sm uppercase tracking-[0.3em] text-primary">GeoStrat</p>
+                    <h1 class="text-4xl font-black">Клеточная стратегия</h1>
+                    <p class="max-w-2xl text-base-content/70">
+                        Пошаговая стратегия | PvP | Экономика
+                    </p>
                 </div>
-            </div>
-        </div>
-    </header>
-
-    <div class="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-        <!-- Игровая карта -->
-        <div class="card bg-base-100 shadow-sm">
-            <div class="card-body">
-                <h2 class="card-title">Игровая карта</h2>
-                <div id="map" class="flex justify-center"></div>
-            </div>
-        </div>
-
-        <!-- Информационная панель -->
-        <div class="space-y-4">
-            <div class="card bg-base-100 shadow-sm">
-                <div class="card-body">
-                    <h2 class="card-title">🎮 Управление ходом</h2>
-                    <div class="flex justify-between">
-                        <span>📊 Ход: <span id="turn-number">1</span></span>
-                        <span>👑 Игрок: <span id="current-player">-</span></span>
-                    </div>
-                    <div id="turn-status" class="text-center font-bold">⏳ Загрузка...</div>
-                    <div class="flex gap-2">
-                        <button id="start-turn-btn" class="btn btn-primary flex-1 hidden">🎯 Начать ход</button>
-                        <button id="end-turn-btn" class="btn btn-secondary flex-1 hidden">✅ Завершить ход</button>
+                <div class="flex flex-col items-start gap-3 sm:items-end">
+                    <div id="auth-state" class="badge badge-neutral badge-lg">Проверяем сессию...</div>
+                    <div class="flex gap-3">
+                        <button id="login-link" class="btn btn-primary btn-sm hidden">🔐 Войти</button>
+                        <button id="new-game-btn" class="btn btn-primary btn-sm hidden">🎮 Новая игра</button>
+                        <button id="logout-button" class="btn btn-neutral btn-sm hidden" type="button">🚪 Выйти</button>
                     </div>
                 </div>
             </div>
+        </header>
 
-            <div class="card bg-base-100 shadow-sm">
-                <div class="card-body">
-                    <h2 class="card-title">💰 Мои ресурсы</h2>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>🪙 Золото: <span id="gold">0</span></div>
-                        <div>🌲 Дерево: <span id="wood">0</span></div>
-                        <div>🍖 Еда: <span id="food">0</span></div>
-                        <div>⚔️ Войска: <span id="total-troops">0</span></div>
+        <div id="game-container" class="hidden">
+            <div class="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+                <div class="card bg-base-100 shadow-sm">
+                    <div class="card-body">
+                        <h2 class="card-title">Игровая карта</h2>
+                        <div id="map" class="flex justify-center"></div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="card bg-base-100 shadow-sm">
+                        <div class="card-body">
+                            <h2 class="card-title">🎮 Управление ходом</h2>
+                            <div class="flex justify-between">
+                                <span>📊 Ход: <span id="turn-number">1</span></span>
+                                <span>👑 Игрок: <span id="current-player">-</span></span>
+                            </div>
+                            <div id="turn-status" class="text-center font-bold">⏳ Загрузка...</div>
+                            <div id="turn-alert" class="mt-2"></div>
+                            <div class="flex gap-2">
+                                <button id="start-turn-btn" class="btn btn-primary flex-1 hidden">🎯 Начать ход</button>
+                                <button id="end-turn-btn" class="btn btn-secondary flex-1 hidden">✅ Завершить ход</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-base-100 shadow-sm">
+                        <div class="card-body">
+                            <h2 class="card-title">💰 Мои ресурсы</h2>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>🪙 Золото: <span id="gold">0</span></div>
+                                <div>🌲 Дерево: <span id="wood">0</span></div>
+                                <div>🍖 Еда: <span id="food">0</span></div>
+                                <div>⚔️ Войска: <span id="total-troops">0</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="attack-panel" class="card bg-base-100 shadow-sm hidden">
+                        <div class="card-body">
+                            <h2 class="card-title">⚔️ Атака</h2>
+                            <div id="attack-alert"></div>
+                            <input type="number" id="troops-input" class="input input-bordered w-full" placeholder="Количество войск" min="1">
+                            <button id="attack-btn" class="btn btn-error w-full mt-2">🔥 Атаковать!</button>
+                        </div>
+                    </div>
+
+                    <div class="card bg-base-100 shadow-sm">
+                        <div class="card-body">
+                            <h2 class="card-title">🏆 Таблица лидеров</h2>
+                            <div id="leaderboard-list" class="space-y-1 text-sm"></div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-base-100 shadow-sm">
+                        <div class="card-body">
+                            <h2 class="card-title">📜 Лог боя</h2>
+                            <div id="battle-log" class="h-32 overflow-y-auto space-y-1 text-xs"></div>
+                        </div>
                     </div>
                 </div>
             </div>
-
-            <div id="attack-panel" class="card bg-base-100 shadow-sm hidden">
-                <div class="card-body">
-                    <h2 class="card-title">⚔️ Атака</h2>
-                    <input type="number" id="troops-input" class="input input-bordered" placeholder="Количество войск" min="1">
-                    <button id="attack-btn" class="btn btn-error">🔥 Атаковать!</button>
-                </div>
-            </div>
-
-            <div class="card bg-base-100 shadow-sm">
-                <div class="card-body">
-                    <h2 class="card-title">🏆 Таблица лидеров</h2>
-                    <div id="leaderboard-list" class="space-y-1 text-sm"></div>
-                </div>
-            </div>
-
-            <div class="card bg-base-100 shadow-sm">
-                <div class="card-body">
-                    <h2 class="card-title">📜 Лог боя</h2>
-                    <div id="battle-log" class="h-32 overflow-y-auto space-y-1 text-xs"></div>
-                </div>
-            </div>
         </div>
+
+        <!-- Модальное окно выбора сложности AI -->
+        <dialog id="difficulty-modal" class="modal">
+            <div class="modal-box">
+                <h3 class="text-lg font-bold mb-4">Выберите сложность AI</h3>
+                <div class="space-y-3">
+                    <button class="difficulty-btn w-full btn btn-ghost justify-start gap-4" data-difficulty="AGGRESSIVE">
+                        <span class="text-2xl">🔥</span>
+                        <div class="text-left">
+                            <div class="font-bold text-error">Агрессивный</div>
+                            <div class="text-sm opacity-70">Постоянно атакует, не дает расслабиться</div>
+                        </div>
+                    </button>
+                    <button class="difficulty-btn w-full btn btn-ghost justify-start gap-4" data-difficulty="DEFENSIVE">
+                        <span class="text-2xl">🛡️</span>
+                        <div class="text-left">
+                            <div class="font-bold text-info">Защитный</div>
+                            <div class="text-sm opacity-70">Укрепляет позиции, атакует только при преимуществе</div>
+                        </div>
+                    </button>
+                    <button class="difficulty-btn w-full btn btn-ghost justify-start gap-4" data-difficulty="ECONOMIC">
+                        <span class="text-2xl">💰</span>
+                        <div class="text-left">
+                            <div class="font-bold text-success">Экономический</div>
+                            <div class="text-sm opacity-70">Копит ресурсы, атакует нейтралов</div>
+                        </div>
+                    </button>
+                    <button class="difficulty-btn w-full btn btn-ghost justify-start gap-4" data-difficulty="BALANCED">
+                        <span class="text-2xl">⚖️</span>
+                        <div class="text-left">
+                            <div class="font-bold text-warning">Сбалансированный</div>
+                            <div class="text-sm opacity-70">Сбалансированная тактика</div>
+                        </div>
+                    </button>
+                    <button class="difficulty-btn w-full btn btn-ghost justify-start gap-4" data-difficulty="RANDOM">
+                        <span class="text-2xl">🎲</span>
+                        <div class="text-left">
+                            <div class="font-bold text-accent">Случайный</div>
+                            <div class="text-sm opacity-70">Непредсказуемые действия</div>
+                        </div>
+                    </button>
+                </div>
+                <div class="modal-action">
+                    <button id="close-modal-btn" class="btn btn-ghost">Отмена</button>
+                </div>
+            </div>
+        </dialog>
     </div>
 </div>
 
 <script>
-    // Auth API
-    const AuthApi = {
-        async getCurrentUser() {
-            try {
-                const response = await fetch('/api/user/me', {
-                    credentials: 'include'
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    return data;
-                }
-                return null;
-            } catch (error) {
-                console.error('Failed to get user:', error);
-                return null;
-            }
-        },
+    (async function() {
+        const AuthApi = window.AuthApi;
+        const loader = document.getElementById("loader");
+        const mainContent = document.getElementById("main-content");
 
-        async logout() {
-            const response = await fetch('/api/user/logout', {
-                method: 'GET',
-                credentials: 'include'
-            });
-            if (response.ok) {
-                const data = await response.json();
-                if (data.redirect) {
-                    window.location.href = data.redirect;
-                }
-            }
-        },
+        // Проверяем авторизацию
+        const { status, body } = await AuthApi.getCurrentUser();
+        const authenticated = status === 200 && body?.authenticated;
 
-        showAlert(containerId, type, message) {
-            const container = document.getElementById(containerId);
-            if (!container) {
-                // Если контейнер не найден, показываем всплывающее уведомление
-                const alertDiv = document.createElement('div');
-                alertDiv.className = `alert alert-${type === 'alert-error' ? 'error' : 'success'} fixed top-4 right-4 z-50 shadow-lg max-w-md`;
-                alertDiv.innerHTML = `
-                    <span>${message}</span>
-                    <button class="btn btn-sm btn-ghost" onclick="this.parentElement.remove()">✕</button>
-                `;
-                document.body.appendChild(alertDiv);
-                setTimeout(() => alertDiv.remove(), 5000);
-                return;
-            }
-
-            const alertClass = type === 'alert-error' ? 'alert-error' : 'alert-success';
-            container.innerHTML = `
-                <div class="alert ${alertClass} shadow-lg">
-                    <span>${message}</span>
-                </div>
-            `;
-            setTimeout(() => {
-                if (container.innerHTML === message) {
-                    container.innerHTML = "";
-                }
-            }, 5000);
-        },
-
-        extractDisplayName(userInfo) {
-            return userInfo?.username || userInfo?.email || userInfo?.name || 'User';
-        }
-    };
-
-    // Game API
-    const GameApi = {
-        async request(endpoint, options = {}) {
-            const response = await fetch(`/api/game${endpoint}`, {
-                ...options,
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...options.headers
-                }
-            });
-
-            if (!response.ok) {
-                if (response.status === 401) {
-                    window.location.href = '/login.html';
-                    throw new Error('Unauthorized');
-                }
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            return await response.json();
-        },
-
-        getMap: () => GameApi.request('/map'),
-        getGameState: () => GameApi.request('/state'),
-        startTurn: () => GameApi.request('/turn/start', { method: 'POST' }),
-        endTurn: () => GameApi.request('/turn/end', { method: 'POST' }),
-        attack: (x, y, troops) => GameApi.request('/attack', {
-            method: 'POST',
-            body: JSON.stringify({ x, y, troops })
-        }),
-        getLeaderboard: () => GameApi.request('/leaderboard')
-    };
-
-    // Основная логика игры
-    let selectedCell = null;
-    let mapData = null;
-    let myPlayerId = null;
-    let myPlayerName = null;
-    let gameState = {
-        canStartTurn: false,
-        canAttack: false,
-        gameState: 'WAITING',
-        currentTurnPlayer: null,
-        turn: 1
-    };
-
-    async function refreshAuthState() {
-        try {
-            const userData = await AuthApi.getCurrentUser();
-            const authenticated = userData?.authenticated === true;
-
-            const authStateBadge = document.getElementById("auth-state");
-            const logoutButton = document.getElementById("logout-button");
-            const loginLink = document.getElementById("login-link");
-
-            if (authStateBadge) {
-                authStateBadge.className = authenticated
-                    ? "badge badge-success badge-lg"
-                    : "badge badge-warning badge-lg";
-                authStateBadge.textContent = authenticated
-                    ? `Вы вошли как ${AuthApi.extractDisplayName(userData)}`
-                    : "Не авторизован";
-            }
-
-            if (loginLink) {
-                loginLink.classList.toggle("hidden", authenticated);
-            }
-
-            if (logoutButton) {
-                logoutButton.classList.toggle("hidden", !authenticated);
-            }
-
-            if (authenticated) {
-                await loadMap();
-                await checkGameState();
-                await loadLeaderboard();
-            }
-        } catch (error) {
-            console.error('Auth error:', error);
-            const authStateBadge = document.getElementById("auth-state");
-            if (authStateBadge) {
-                authStateBadge.textContent = "Ошибка авторизации";
-            }
-        }
-    }
-
-    async function loadMap() {
-        try {
-            const data = await GameApi.getMap();
-            if (data) {
-                mapData = data;
-                if (!myPlayerId && data.players?.length > 0) {
-                    myPlayerId = data.players[0]?.id;
-                    myPlayerName = data.players[0]?.name;
-                }
-                renderMap();
-            }
-        } catch (error) {
-            console.error('Load map error:', error);
-        }
-    }
-
-    function renderMap() {
-        const mapDiv = document.getElementById('map');
-        if (!mapData || !mapDiv) return;
-
-        mapDiv.innerHTML = '';
-        for (let y = 0; y < 10; y++) {
-            for (let x = 0; x < 10; x++) {
-                const cell = mapData.cells?.find(c => c.x === x && c.y === y);
-                if (!cell) continue;
-
-                const cellDiv = document.createElement('div');
-                cellDiv.className = 'cell';
-                cellDiv.setAttribute('data-x', x);
-                cellDiv.setAttribute('data-y', y);
-
-                if (cell.water) cellDiv.classList.add('water');
-                else if (cell.owner === null) cellDiv.classList.add('neutral');
-                else if (cell.owner === myPlayerId) cellDiv.classList.add('player1');
-                else cellDiv.classList.add('player2');
-
-                let terrainIcon = '⬜';
-                switch(cell.terrain) {
-                    case 'FOREST': terrainIcon = '🌲'; break;
-                    case 'MOUNTAIN': terrainIcon = '⛰️'; break;
-                    case 'CITY': terrainIcon = '🏙️'; break;
-                    case 'WATER': terrainIcon = '💧'; break;
-                    default: terrainIcon = '🌾';
-                }
-
-                cellDiv.innerHTML = `
-                    <div class="terrain-icon">${terrainIcon}</div>
-                    <div class="troops">⚔️ ${cell.troops}</div>
-                `;
-                cellDiv.onclick = () => selectCell(cell);
-
-                if (selectedCell && selectedCell.x === x && selectedCell.y === y) {
-                    cellDiv.classList.add('selected');
-                }
-                mapDiv.appendChild(cellDiv);
-            }
-        }
-    }
-
-    function selectCell(cell) {
-        if (!gameState.canAttack) {
-            AuthApi.showAlert('battle-log', 'alert-warning', 'Сначала начните ход!');
+        if (!authenticated) {
+            // Если не авторизован - перенаправляем на страницу входа
+            window.location.href = "/login.html";
             return;
         }
 
-        selectedCell = cell;
-        renderMap();
+        // Скрываем лоадер и показываем основной контент
+        loader.style.display = "none";
+        mainContent.style.display = "block";
 
-        const attackPanel = document.getElementById('attack-panel');
-        if (attackPanel) attackPanel.classList.remove('hidden');
+        // Инициализация игры
+        const authStateBadge = document.getElementById("auth-state");
+        const loginLink = document.getElementById("login-link");
+        const logoutButton = document.getElementById("logout-button");
+        const newGameBtn = document.getElementById("new-game-btn");
+        const gameContainer = document.getElementById("game-container");
+        const difficultyModal = document.getElementById("difficulty-modal");
+        const closeModalBtn = document.getElementById("close-modal-btn");
 
-        const troopsInput = document.getElementById('troops-input');
-        if (troopsInput) {
-            const myCells = mapData?.cells?.filter(c => c.owner === myPlayerId && !c.water);
-            if (myCells?.length > 0) {
-                troopsInput.max = Math.min(20, myCells[0].troops);
-                troopsInput.min = 1;
-                troopsInput.value = Math.min(troopsInput.max, Math.floor(cell.troops / 2) || 1);
-            }
-        }
-    }
+        let myPlayerId = null;
+        let myPlayerName = null;
+        let gameActive = false;
 
-    async function checkGameState() {
-        try {
-            const body = await GameApi.getGameState();
-            if (body) {
-                gameState = body;
+        const GameApi = {
+            async request(endpoint, options = {}) {
+                const response = await fetch(`/api/game${endpoint}`, {
+                    ...options,
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
 
-                document.getElementById('turn-number').innerText = body.turn || 1;
-                document.getElementById('current-player').innerText = body.currentTurnPlayer || '-';
-
-                const startTurnBtn = document.getElementById('start-turn-btn');
-                const endTurnBtn = document.getElementById('end-turn-btn');
-                const turnStatus = document.getElementById('turn-status');
-
-                if (body.winner) {
-                    if (turnStatus) turnStatus.innerHTML = `🏆 ПОБЕДИТЕЛЬ: ${body.winner}! 🏆`;
-                    return;
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        throw new Error('Unauthorized');
+                    }
+                    throw new Error(`HTTP ${response.status}`);
                 }
 
-                if (body.canAttack) {
-                    if (startTurnBtn) startTurnBtn.classList.add('hidden');
-                    if (endTurnBtn) endTurnBtn.classList.remove('hidden');
-                    if (turnStatus) turnStatus.innerHTML = `🎲 ВАШ ХОД! Действуйте! (${myPlayerName})`;
-                } else if (body.canStartTurn) {
-                    if (startTurnBtn) startTurnBtn.classList.remove('hidden');
-                    if (endTurnBtn) endTurnBtn.classList.add('hidden');
-                    if (turnStatus) turnStatus.innerHTML = `🎯 ВАШ ХОД! Нажмите "Начать ход" (${myPlayerName})`;
-                } else {
-                    if (startTurnBtn) startTurnBtn.classList.add('hidden');
-                    if (endTurnBtn) endTurnBtn.classList.add('hidden');
-                    if (turnStatus) turnStatus.innerHTML = `⏳ Ожидание хода: ${body.currentTurnPlayer || 'противника'}`;
+                return await response.json();
+            },
+
+            startVsAI: (playerId, playerName, difficulty) => GameApi.request('/start-vs-ai', {
+                method: 'POST',
+                body: JSON.stringify({ playerId, playerName, difficulty })
+            }),
+
+            reset: () => GameApi.request('/reset', { method: 'POST' }),
+
+            getMap: () => GameApi.request('/map'),
+            getGameState: () => GameApi.request('/state'),
+            startTurn: () => GameApi.request('/turn/start', { method: 'POST' }),
+            endTurn: () => GameApi.request('/turn/end', { method: 'POST' }),
+            attack: (x, y, troops) => GameApi.request('/attack', {
+                method: 'POST',
+                body: JSON.stringify({ x, y, troops })
+            }),
+            getLeaderboard: () => GameApi.request('/leaderboard')
+        };
+
+        let selectedCell = null;
+        let mapData = null;
+        let gameState = {
+            canStartTurn: false,
+            canAttack: false,
+            gameState: 'WAITING',
+            currentTurnPlayer: null,
+            turn: 1
+        };
+
+        async function refreshAuthState() {
+            authStateBadge.className = "badge badge-success badge-lg";
+            authStateBadge.textContent = `Вы вошли как ${AuthApi.extractDisplayName(body.userInfo)}`;
+
+            loginLink.classList.add("hidden");
+            logoutButton.classList.remove("hidden");
+            newGameBtn.classList.remove("hidden");
+            gameContainer.classList.remove("hidden");
+
+            // Получаем информацию о пользователе
+            try {
+                const userResponse = await fetch('/api/user/me', { credentials: 'include' });
+                if (userResponse.ok) {
+                    const userData = await userResponse.json();
+                    if (userData.authenticated) {
+                        myPlayerId = userData.id;
+                        myPlayerName = userData.username || userData.name || AuthApi.extractDisplayName(body.userInfo);
+                        console.log("Player ID:", myPlayerId, "Name:", myPlayerName);
+                    }
                 }
-
-                updateResources(body);
+            } catch (error) {
+                console.error("Failed to get user details:", error);
+                myPlayerId = body.userInfo?.user || body.userInfo?.email;
+                myPlayerName = AuthApi.extractDisplayName(body.userInfo);
             }
-        } catch (error) {
-            console.error('Check game state error:', error);
+
+            await loadMap();
+            await checkGameState();
+            await loadLeaderboard();
+            gameActive = true;
         }
-    }
 
-    function updateResources(state) {
-        if (state) {
-            const elements = {
-                gold: state.myGold,
-                wood: state.myWood,
-                food: state.myFood,
-                'total-troops': state.myTroops
-            };
+        async function startNewGameVsAI(difficulty) {
+            if (!myPlayerId) {
+                AuthApi.showAlert('turn-alert', 'alert-error', 'ID игрока не найден. Попробуйте выйти и войти снова.');
+                return;
+            }
 
-            for (const [id, value] of Object.entries(elements)) {
+            const result = await GameApi.startVsAI(myPlayerId, myPlayerName, difficulty);
+
+            if (result.success) {
+                gameActive = true;
+                AuthApi.showAlert('turn-alert', 'alert-success', result.message);
+                difficultyModal.close();
+                await loadMap();
+                await checkGameState();
+            } else {
+                AuthApi.showAlert('turn-alert', 'alert-error', result.message);
+            }
+        }
+
+        async function loadMap() {
+            try {
+                const data = await GameApi.getMap();
+                if (data) {
+                    mapData = data;
+                    renderMap();
+                }
+            } catch (error) {
+                console.error('Load map error:', error);
+            }
+        }
+
+        function renderMap() {
+            const mapDiv = document.getElementById('map');
+            if (!mapData || !mapDiv) return;
+
+            mapDiv.innerHTML = '';
+            for (let y = 0; y < 10; y++) {
+                for (let x = 0; x < 10; x++) {
+                    const cell = mapData.cells?.find(c => c.x === x && c.y === y);
+                    if (!cell) continue;
+
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell';
+
+                    if (cell.isWater) cellDiv.classList.add('water');
+                    else if (cell.owner === null) cellDiv.classList.add('neutral');
+                    else if (cell.owner === myPlayerId) cellDiv.classList.add('player1');
+                    else cellDiv.classList.add('player2');
+
+                    let terrainIcon = '⬜';
+                    switch(cell.terrain) {
+                        case 'FOREST': terrainIcon = '🌲'; break;
+                        case 'MOUNTAIN': terrainIcon = '⛰️'; break;
+                        case 'CITY': terrainIcon = '🏙️'; break;
+                        case 'WATER': terrainIcon = '💧'; break;
+                        default: terrainIcon = '🌾';
+                    }
+
+                    cellDiv.innerHTML = `<div class="terrain-icon">${terrainIcon}</div><div class="troops">⚔️ ${cell.troops}</div>`;
+                    cellDiv.onclick = () => selectCell(cell);
+
+                    if (selectedCell && selectedCell.x === x && selectedCell.y === y) {
+                        cellDiv.classList.add('selected');
+                    }
+                    mapDiv.appendChild(cellDiv);
+                }
+            }
+        }
+
+        function selectCell(cell) {
+            if (!gameState.canAttack) {
+                AuthApi.showAlert('turn-alert', 'alert-warning', 'Сначала начните ход!');
+                return;
+            }
+
+            selectedCell = cell;
+            renderMap();
+
+            const attackPanel = document.getElementById('attack-panel');
+            if (attackPanel) attackPanel.classList.remove('hidden');
+
+            const troopsInput = document.getElementById('troops-input');
+            if (troopsInput) {
+                const myCells = mapData?.cells?.filter(c => c.owner === myPlayerId && !c.isWater);
+                if (myCells?.length > 0) {
+                    troopsInput.max = Math.min(20, myCells[0].troops);
+                    troopsInput.min = 1;
+                    troopsInput.value = Math.min(troopsInput.max, Math.floor(cell.troops / 2) || 1);
+                }
+            }
+        }
+
+        async function checkGameState() {
+            try {
+                const body = await GameApi.getGameState();
+                if (body) {
+                    gameState = body;
+
+                    document.getElementById('turn-number').innerText = body.turn || 1;
+                    document.getElementById('current-player').innerText = body.currentTurnPlayer || '-';
+
+                    const startTurnBtn = document.getElementById('start-turn-btn');
+                    const endTurnBtn = document.getElementById('end-turn-btn');
+                    const turnStatus = document.getElementById('turn-status');
+
+                    if (body.winner) {
+                        if (turnStatus) turnStatus.innerHTML = `🏆 ПОБЕДИТЕЛЬ: ${body.winner}! 🏆`;
+                        return;
+                    }
+
+                    if (body.canAttack) {
+                        startTurnBtn?.classList.add('hidden');
+                        endTurnBtn?.classList.remove('hidden');
+                        turnStatus.innerHTML = `🎲 ВАШ ХОД! Действуйте!`;
+                    } else if (body.canStartTurn) {
+                        startTurnBtn?.classList.remove('hidden');
+                        endTurnBtn?.classList.add('hidden');
+                        turnStatus.innerHTML = `🎯 ВАШ ХОД! Нажмите "Начать ход"`;
+                    } else {
+                        startTurnBtn?.classList.add('hidden');
+                        endTurnBtn?.classList.add('hidden');
+                        turnStatus.innerHTML = `⏳ Ход игрока: ${body.currentTurnPlayer || 'противника'}`;
+                    }
+
+                    updateResources(body);
+                }
+            } catch (error) {
+                console.error('Check game state error:', error);
+            }
+        }
+
+        function updateResources(state) {
+            const elements = { gold: 'myGold', wood: 'myWood', food: 'myFood', 'total-troops': 'myTroops' };
+            for (const [id, key] of Object.entries(elements)) {
                 const el = document.getElementById(id);
-                if (el) el.innerText = value || 0;
+                if (el) el.innerText = state[key] || 0;
             }
         }
-    }
 
-    async function loadLeaderboard() {
-        try {
-            const data = await GameApi.getLeaderboard();
-            if (data && Array.isArray(data)) {
-                const container = document.getElementById('leaderboard-list');
-                if (container) {
-                    container.innerHTML = data.map((player, idx) => `
-                        <div class="flex justify-between items-center">
-                            <span class="${idx < 3 ? 'font-bold text-primary' : ''}">${idx + 1}. ${player.name}</span>
-                            <span>🏆 ${player.totalWins || 0} побед</span>
-                        </div>
-                    `).join('');
+        async function loadLeaderboard() {
+            try {
+                const data = await GameApi.getLeaderboard();
+                if (data && Array.isArray(data)) {
+                    const container = document.getElementById('leaderboard-list');
+                    if (container) {
+                        container.innerHTML = data.map((player, idx) => `
+                            <div class="flex justify-between items-center">
+                                <span class="${idx < 3 ? 'font-bold text-primary' : ''}">${idx + 1}. ${player.name}</span>
+                                <span>🏆 ${player.totalWins || 0} побед</span>
+                            </div>
+                        `).join('');
+                    }
                 }
+            } catch (error) {
+                console.error('Load leaderboard error:', error);
             }
-        } catch (error) {
-            console.error('Load leaderboard error:', error);
         }
-    }
 
-    function addBattleLog(message) {
-        const logDiv = document.getElementById('battle-log');
-        if (!logDiv) return;
-
-        const entry = document.createElement('div');
-        entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
-        logDiv.insertBefore(entry, logDiv.firstChild);
-
-        // Ограничиваем количество записей
-        while (logDiv.children.length > 50) {
-            logDiv.removeChild(logDiv.lastChild);
+        function addBattleLog(message) {
+            const logDiv = document.getElementById('battle-log');
+            if (!logDiv) return;
+            const entry = document.createElement('div');
+            entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+            while (logDiv.children.length > 50) logDiv.removeChild(logDiv.lastChild);
         }
-    }
 
-    // Инициализация
-    document.addEventListener('DOMContentLoaded', async () => {
-        const startTurnBtn = document.getElementById('start-turn-btn');
-        const endTurnBtn = document.getElementById('end-turn-btn');
-        const attackBtn = document.getElementById('attack-btn');
-        const troopsInput = document.getElementById('troops-input');
-        const logoutButton = document.getElementById('logout-button');
-
-        if (startTurnBtn) {
-            startTurnBtn.onclick = async () => {
+        // Обработчики событий
+        function setupEventListeners() {
+            document.getElementById('start-turn-btn')?.addEventListener('click', async () => {
                 const body = await GameApi.startTurn();
                 if (body?.success) {
                     addBattleLog('🎮 Начат новый ход! Получены ресурсы.');
                     await checkGameState();
                     await loadMap();
                 } else {
-                    AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Не удалось начать ход');
+                    AuthApi.showAlert('turn-alert', 'alert-error', body?.message || 'Не удалось начать ход');
                 }
-            };
-        }
+            });
 
-        if (endTurnBtn) {
-            endTurnBtn.onclick = async () => {
+            document.getElementById('end-turn-btn')?.addEventListener('click', async () => {
                 const body = await GameApi.endTurn();
                 if (body?.success) {
                     addBattleLog('✅ Ход завершен!');
                     selectedCell = null;
-                    const attackPanel = document.getElementById('attack-panel');
-                    if (attackPanel) attackPanel.classList.add('hidden');
+                    document.getElementById('attack-panel')?.classList.add('hidden');
                     await checkGameState();
                     await loadMap();
                 } else {
-                    AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Не удалось завершить ход');
+                    AuthApi.showAlert('turn-alert', 'alert-error', body?.message || 'Не удалось завершить ход');
                 }
-            };
-        }
+            });
 
-        if (attackBtn && troopsInput) {
-            attackBtn.onclick = async () => {
+            document.getElementById('attack-btn')?.addEventListener('click', async () => {
                 if (!selectedCell) {
-                    AuthApi.showAlert('battle-log', 'alert-warning', 'Выберите клетку для атаки!');
+                    AuthApi.showAlert('attack-alert', 'alert-warning', 'Выберите клетку для атаки!');
                     return;
                 }
-
-                const troops = troopsInput.value;
+                const troops = document.getElementById('troops-input')?.value;
                 if (!troops || troops < 1) {
-                    AuthApi.showAlert('battle-log', 'alert-warning', 'Введите количество войск!');
+                    AuthApi.showAlert('attack-alert', 'alert-warning', 'Введите количество войск!');
                     return;
                 }
-
                 const body = await GameApi.attack(selectedCell.x, selectedCell.y, parseInt(troops));
                 if (body?.status === 'ok') {
                     addBattleLog(`⚔️ Атака на клетку [${selectedCell.x},${selectedCell.y}] с ${troops} войсками!`);
                     await loadMap();
                     await checkGameState();
                 } else {
-                    AuthApi.showAlert('battle-log', 'alert-error', body?.message || 'Ошибка атаки');
+                    AuthApi.showAlert('attack-alert', 'alert-error', body?.message || 'Ошибка атаки');
                 }
-            };
-        }
+            });
 
-        if (logoutButton) {
-            logoutButton.addEventListener("click", async () => {
-                await AuthApi.logout();
+            logoutButton?.addEventListener('click', () => AuthApi.logout());
+
+            newGameBtn?.addEventListener('click', () => {
+                difficultyModal.showModal();
+            });
+
+            document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const difficulty = btn.getAttribute('data-difficulty');
+                    startNewGameVsAI(difficulty);
+                });
+            });
+
+            closeModalBtn?.addEventListener('click', () => {
+                difficultyModal.close();
             });
         }
 
         await refreshAuthState();
+        setupEventListeners();
 
         // Периодическое обновление
         setInterval(() => {
-            if (!gameState.canAttack && !gameState.canStartTurn) {
-                loadMap();
+            if (gameActive) {
+                if (!gameState.canAttack && !gameState.canStartTurn) loadMap();
+                checkGameState();
+                loadLeaderboard();
             }
-            checkGameState();
-            loadLeaderboard();
         }, 5000);
-    });
+    })();
 </script>
 </body>
 </html>

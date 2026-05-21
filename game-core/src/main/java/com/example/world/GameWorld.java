@@ -15,12 +15,17 @@ public class GameWorld {
     private final GameEngine engine = new GameEngine();
     private volatile boolean running = false;
     private TurnService turnService;
+    private int worldWidth = 10;
+    private int worldHeight = 10;
+    private boolean worldCreated = false;
 
     public void setTurnService(TurnService turnService) {
         this.turnService = turnService;
     }
 
     public void createWorld(int width, int height) {
+        this.worldWidth = width;
+        this.worldHeight = height;
         Random random = new Random();
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
@@ -35,7 +40,31 @@ public class GameWorld {
                 cells.put(cell.getId(), cell);
             }
         }
+        worldCreated = true;
         System.out.printf("Создан мир %dx%d, всего клеток: %d%n", width, height, cells.size());
+    }
+
+    // НОВЫЙ МЕТОД ДЛЯ СБРОСА ИГРЫ
+    public void reset() {
+        // Очищаем все данные
+        cells.clear();
+        players.clear();
+
+        // Сбрасываем флаги
+        running = false;
+        worldCreated = false;
+
+        // Пересоздаем мир
+        createWorld(worldWidth, worldHeight);
+
+        System.out.println("🔄 Игровой мир сброшен!");
+    }
+
+    // НОВЫЙ МЕТОД ДЛЯ БЫСТРОГО ОБНОВЛЕНИЯ КАРТЫ
+    public void refreshWorld() {
+        if (!worldCreated) {
+            createWorld(worldWidth, worldHeight);
+        }
     }
 
     public void addPlayer(Player player, int startX, int startY) {
@@ -110,22 +139,23 @@ public class GameWorld {
     public Player getWinner() {
         return turnService != null ? turnService.getWinner() : null;
     }
+
     public void clear() {
         cells.clear();
         players.clear();
+        worldCreated = false;
     }
 
     public void addCell(Cell cell) {
         cells.put(cell.getId(), cell);
     }
 
-
     public void addPlayerDirect(Player player) {
         players.put(player.getId(), player);
     }
-    public void executeInstantAttack(List<Cell> playerterritory, Cell attackcell, String playerId) {
 
-        System.out.println("⚔️ Атака: " + playerId + " -> " +  "Клетки" +  attackcell);
+    public void executeInstantAttack(List<Cell> playerterritory, Cell attackcell, String playerId) {
+        System.out.println("⚔️ Атака: " + playerId + " -> " + "Клетки" + attackcell);
 
         if (playerterritory == null || attackcell == null) {
             throw new IllegalArgumentException("Клетка не найдена");

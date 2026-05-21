@@ -14,15 +14,33 @@ public class CurrentUserService {
     }
 
     public String getAuthId() {
-        return request().getHeader("X-Auth-Request-User");
+        // Пробуем разные возможные заголовки от oauth2-proxy
+        String user = request().getHeader("X-Forwarded-User");
+        if (user != null && !user.isEmpty()) return user;
+
+        String email = request().getHeader("X-Forwarded-Email");
+        if (email != null && !email.isEmpty()) return email;
+
+        String preferredUsername = request().getHeader("X-Forwarded-Preferred-Username");
+        if (preferredUsername != null && !preferredUsername.isEmpty()) return preferredUsername;
+
+        return null;
     }
 
     public String getEmail() {
-        return request().getHeader("X-Auth-Request-Email");
+        String email = request().getHeader("X-Forwarded-Email");
+        if (email != null && !email.isEmpty()) return email;
+        return null;
     }
 
     public String getUsername() {
-        return request().getHeader("X-Auth-Request-Preferred-Username");
+        String username = request().getHeader("X-Forwarded-Preferred-Username");
+        if (username != null && !username.isEmpty()) return username;
+
+        String user = request().getHeader("X-Forwarded-User");
+        if (user != null && !user.isEmpty()) return user;
+
+        return null;
     }
 
     public String getFirstName() {

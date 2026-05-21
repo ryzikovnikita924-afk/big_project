@@ -1,58 +1,37 @@
 package com.example.Controller;
 
-import com.example.dto.UniversalResponse;
-import com.example.dto.auth.AuthStateResponse;
+import com.example.dto.UserInfoHeaders;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
-import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/auth")
+@RequestMapping("/api")
 public class SecurityController {
 
     @GetMapping("/me")
-    public ResponseEntity<UniversalResponse<AuthStateResponse>> currentUser(
-            Authentication authentication,
-            CsrfToken csrfToken
-    ) {
-        // Явно материализуем токен, чтобы Spring записал XSRF-TOKEN в cookie
-        if (csrfToken != null) {
-            csrfToken.getToken();
+    public ResponseEntity<Map<String, Object>> currentUser(UserInfoHeaders userInfoHeaders) {
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("authenticated", userInfoHeaders.authenticated());
+
+        if (userInfoHeaders.authenticated()) {
+            Map<String, Object> userInfo = new HashMap<>();
+            if (userInfoHeaders.user() != null) userInfo.put("user", userInfoHeaders.user());
+            if (userInfoHeaders.email() != null) userInfo.put("email", userInfoHeaders.email());
+            if (userInfoHeaders.preferredUsername() != null) userInfo.put("preferred_username", userInfoHeaders.preferredUsername());
+            if (!userInfoHeaders.groups().isEmpty()) userInfo.put("groups", userInfoHeaders.groups());
+            response.put("userInfo", userInfo);
         }
 
-        boolean authenticated = authentication != null
-                && authentication.isAuthenticated()
-                && authentication.getPrincipal() instanceof OAuth2AuthenticatedPrincipal;
-
-        Map<String, Object> userInfo = Collections.emptyMap();
-        if (authenticated) {
-            Object principal = authentication.getPrincipal();
-            if (principal instanceof OidcUser oidcUser) {
-                // Для OIDC Spring сам объединяет claims из id_token и userinfo endpoint
-                userInfo = oidcUser.getClaims();
-            } else {
-                userInfo = ((OAuth2AuthenticatedPrincipal) principal).getAttributes();
-            }
-        }
-
-        AuthStateResponse response = authenticated
-                ? new AuthStateResponse(true, userInfo)
-                : new AuthStateResponse(false, userInfo);
-
-        HttpStatus status = authenticated ? HttpStatus.OK : HttpStatus.UNAUTHORIZED;
-        return ResponseEntity.status(status).body(new UniversalResponse<>(response));
+        return ResponseEntity.ok(response);
     }
 }

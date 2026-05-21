@@ -3,10 +3,12 @@ package com.example.Controller;
 import com.example.dto.UniversalResponse;
 import com.example.exception.BaseException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 
 import java.util.stream.Collectors;
 
@@ -26,14 +28,19 @@ public class GlobalExceptionHandler {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .collect(Collectors.joining("; "));
-
         UniversalResponse<Object> response = new UniversalResponse<>(4001, message);
         return ResponseEntity.status(400).body(response);
     }
 
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    public ResponseEntity<UniversalResponse<Object>> handleMediaTypeNotAcceptable(HttpMediaTypeNotAcceptableException ex) {
+
+        UniversalResponse<Object> response = new UniversalResponse<>(200, "OK");
+        return ResponseEntity.ok(response);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<UniversalResponse<Object>> handleGeneralException(Exception ex) {
-
         UniversalResponse<Object> response = new UniversalResponse<>(5000, "Internal Server Error: " + ex.getMessage());
         return ResponseEntity.status(500).body(response);
     }

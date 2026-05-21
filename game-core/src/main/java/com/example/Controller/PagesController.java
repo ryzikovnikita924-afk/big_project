@@ -12,9 +12,8 @@ public class PagesController implements WebMvcConfigurer {
 
     @Override
     public void addViewControllers(@NonNull ViewControllerRegistry registry) {
-        // Отдаем статическую страницу логина
-        registry.addViewController("/login").setViewName("login");
-        // Если нужно перенаправление на HTML страницу
-        registry.addRedirectViewController("/login-page", "/login.html");
+
+
+        registry.addViewController("/").setViewName("forward:/index.html");
     }
 }
