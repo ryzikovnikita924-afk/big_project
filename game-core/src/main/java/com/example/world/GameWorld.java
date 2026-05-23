@@ -27,58 +27,47 @@ public class GameWorld {
         this.worldWidth = width;
         this.worldHeight = height;
         Random random = new Random();
+
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
+                boolean isPlayerStart = (x == 2 && y == 2);
+                boolean isAIStart = (x == 7 && y == 7);
+
                 TerrainType terrain;
                 double rand = random.nextDouble();
-                if (rand < 0.1) terrain = TerrainType.WATER;
-                else if (rand < 0.3) terrain = TerrainType.FOREST;
-                else if (rand < 0.4) terrain = TerrainType.MOUNTAIN;
-                else if (rand < 0.5) terrain = TerrainType.CITY;
-                else terrain = TerrainType.PLAIN;
+
+                if (isPlayerStart || isAIStart) {
+                    terrain = TerrainType.PLAIN;
+                } else {
+                    if (rand < 0.1) terrain = TerrainType.WATER;
+                    else if (rand < 0.3) terrain = TerrainType.FOREST;
+                    else if (rand < 0.4) terrain = TerrainType.MOUNTAIN;
+                    else if (rand < 0.5) terrain = TerrainType.CITY;
+                    else terrain = TerrainType.PLAIN;
+                }
+
                 Cell cell = new Cell(x, y, terrain);
                 cells.put(cell.getId(), cell);
             }
         }
+
         worldCreated = true;
         System.out.printf("Создан мир %dx%d, всего клеток: %d%n", width, height, cells.size());
     }
 
-    // НОВЫЙ МЕТОД ДЛЯ СБРОСА ИГРЫ
     public void reset() {
-        // Очищаем все данные
         cells.clear();
         players.clear();
-
-        // Сбрасываем флаги
         running = false;
         worldCreated = false;
-
-        // Пересоздаем мир
         createWorld(worldWidth, worldHeight);
-
         System.out.println("🔄 Игровой мир сброшен!");
     }
 
-    // НОВЫЙ МЕТОД ДЛЯ БЫСТРОГО ОБНОВЛЕНИЯ КАРТЫ
     public void refreshWorld() {
         if (!worldCreated) {
             createWorld(worldWidth, worldHeight);
         }
-    }
-
-    public void addPlayer(Player player, int startX, int startY) {
-        String cellId = startX + ":" + startY;
-        Cell startCell = cells.get(cellId);
-        if (startCell == null || startCell.isWater()) {
-            throw new IllegalArgumentException("Неверная стартовая позиция!");
-        }
-        players.put(player.getId(), player);
-        startCell.setOwnerId(player.getId());
-        startCell.setTroopsCount(20);
-        player.addCell(startCell);
-        player.addTroops(20);
-        System.out.printf("Игрок %s начал игру на клетке [%d,%d]%n", player.getName(), startX, startY);
     }
 
     public void start() {
@@ -102,10 +91,14 @@ public class GameWorld {
         for (int dx = -1; dx <= 1; dx++) {
             for (int dy = -1; dy <= 1; dy++) {
                 if (dx == 0 && dy == 0) continue;
-                String neighborId = (cell.getX() + dx) + ":" + (cell.getY() + dy);
-                Cell neighbor = cells.get(neighborId);
-                if (neighbor != null && engine.areNeighbors(cell, neighbor)) {
-                    neighbors.add(neighbor);
+                int nx = cell.getX() + dx;
+                int ny = cell.getY() + dy;
+                if (nx >= 0 && nx < worldWidth && ny >= 0 && ny < worldHeight) {
+                    String neighborId = nx + ":" + ny;
+                    Cell neighbor = cells.get(neighborId);
+                    if (neighbor != null) {
+                        neighbors.add(neighbor);
+                    }
                 }
             }
         }
@@ -154,46 +147,142 @@ public class GameWorld {
         players.put(player.getId(), player);
     }
 
-    public void executeInstantAttack(List<Cell> playerterritory, Cell attackcell, String playerId) {
-        System.out.println("⚔️ Атака: " + playerId + " -> " + "Клетки" + attackcell);
+    public void addPlayer(Player player, int startX, int startY) {
+        String cellId = startX + ":" + startY;
+        Cell startCell = cells.get(cellId);
 
-        if (playerterritory == null || attackcell == null) {
+        if (startCell == null || startCell.isWater()) {
+            startCell = findNearestLandCell(startX, startY);
+            if (startCell == null) {
+                throw new IllegalArgumentException("Неверная стартовая позиция!");
+            }
+            System.out.println("Стартовая позиция изменена с [" + startX + "," + startY +
+                    "] на [" + startCell.getX() + "," + startCell.getY() + "]");
+        }
+
+        players.put(player.getId(), player);
+        startCell.setOwnerId(player.getId());
+        player.addCell(startCell);
+        System.out.printf("Игрок %s начал игру на клетке [%d,%d] с %d войсками%n",
+                player.getName(), startCell.getX(), startCell.getY(), player.getTotalTroops());
+    }
+
+    private Cell findNearestLandCell(int startX, int startY) {
+        for (int radius = 1; radius <= 5; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dy = -radius; dy <= radius; dy++) {
+                    int x = startX + dx;
+                    int y = startY + dy;
+                    if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
+                        String cellId = x + ":" + y;
+                        Cell cell = cells.get(cellId);
+                        if (cell != null && !cell.isWater()) {
+                            return cell;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    public void executeInstantAttack(List<Cell> playerTerritory, Cell attackCell, String playerId) {
+        System.out.println("⚔️ Атака: " + playerId + " -> клетка [" + attackCell.getX() + "," + attackCell.getY() + "]");
+
+        if (playerTerritory == null || playerTerritory.isEmpty() || attackCell == null) {
             throw new IllegalArgumentException("Клетка не найдена");
         }
 
-        if (!engine.canAttack(playerterritory, attackcell)) {
-            throw new IllegalStateException("Атака невозможна!");
+        if (!engine.canAttack(playerTerritory, attackCell)) {
+            throw new IllegalStateException("Атака невозможна! Можно атаковать только соседние клетки.");
         }
 
         if (!canAttack(playerId)) {
             throw new IllegalStateException("Сейчас не ваш ход! Начните ход кнопкой 'Начать ход'.");
         }
+
         Player attacker = players.get(playerId);
-        int attackerPower = attacker.getTotalTroops();
-        int defenderPower = attackcell.getDefenseBonus();
-
-        if (attackerPower > defenderPower) {
-            int remainingTroops = attackerPower - defenderPower;
-            String oldOwnerId = attackcell.getOwnerId();
-
-            attackcell.setOwnerId(playerId);
-            attackcell.setTroopsCount(remainingTroops);
-            attacker.setTroopsCount(attacker.getTotalTroops() - attackerPower);
-
-            if (attacker != null) {
-                attacker.addCell(attackcell);
-                attacker.addVictory();
-            }
-            if (oldOwnerId != null) {
-                Player oldOwner = players.get(oldOwnerId);
-                if (oldOwner != null) {
-                    oldOwner.removeCell(attackcell);
-                }
-            }
-            System.out.println("✅ Атака успешна! Клетка захвачена!");
-        } else {
-            attacker.setTroopsCount(attacker.getTotalTroops() - defenderPower);
-            System.out.println("❌ Атака отбита!");
+        if (attacker == null) {
+            throw new IllegalStateException("Атакующий игрок не найден!");
         }
+
+        boolean isNeutral = attackCell.getOwnerId() == null;
+        int conquestCost = attackCell.getConquestCost();
+
+        // Для нейтральных клеток стоимость 0 - не тратим войска
+        if (!isNeutral && attacker.getTotalTroops() < conquestCost) {
+            throw new IllegalStateException("Недостаточно войск для атаки! Нужно " + conquestCost + ", есть " + attacker.getTotalTroops());
+        }
+
+        // Захватываем клетку
+        String oldOwnerId = attackCell.getOwnerId();
+        attackCell.setOwnerId(playerId);
+
+        // Тратим войска только для вражеских клеток
+        if (!isNeutral) {
+            attacker.removeTroops(conquestCost);
+            System.out.println("Потрачено войск: " + conquestCost);
+        } else {
+            System.out.println("🌾 Нейтральная клетка захвачена бесплатно!");
+        }
+
+        System.out.println("Осталось войск у атакующего: " + attacker.getTotalTroops());
+
+        if (oldOwnerId != null && !oldOwnerId.equals(playerId)) {
+            Player oldOwner = players.get(oldOwnerId);
+            if (oldOwner != null) {
+                oldOwner.removeCell(attackCell);
+            }
+            attacker.addVictory();
+        }
+
+        attacker.addCell(attackCell);
+
+        System.out.println("✅ Атака успешна! Клетка захвачена!");
+    }
+
+    public void buildBuilding(Cell cell, BuildingType buildingType, String playerId) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            System.out.println("❌ Игрок не найден для строительства!");
+            return;
+        }
+
+        if (!player.getId().equals(cell.getOwnerId())) {
+            System.out.println("❌ Нельзя строить на чужой клетке!");
+            return;
+        }
+
+        if (cell.hasBuilding()) {
+            System.out.println("❌ На этой клетке уже есть здание!");
+            return;
+        }
+
+        if (!cell.canBuild(buildingType)) {
+            System.out.println("❌ Нельзя построить " + buildingType.getDisplayName() + " на " + cell.getTerrain());
+            return;
+        }
+
+        int costGold = buildingType.getBuildCostGold();
+        int costWood = buildingType.getBuildCostWood();
+
+        if (player.getResource(ResourceType.GOLD) < costGold) {
+            System.out.println("❌ Недостаточно золота! Нужно: " + costGold + ", есть: " + player.getResource(ResourceType.GOLD));
+            return;
+        }
+
+        if (player.getResource(ResourceType.WOOD) < costWood) {
+            System.out.println("❌ Недостаточно дерева! Нужно: " + costWood + ", есть: " + player.getResource(ResourceType.WOOD));
+            return;
+        }
+
+        player.spendResource(ResourceType.GOLD, costGold);
+        player.spendResource(ResourceType.WOOD, costWood);
+        cell.setBuilding(buildingType);
+
+        System.out.println("🏗️ Построено " + buildingType.getDisplayName() +
+                " на клетке [" + cell.getX() + "," + cell.getY() + "]!");
+        System.out.println("   Осталось золота: " + player.getResource(ResourceType.GOLD));
+        System.out.println("   Осталось дерева: " + player.getResource(ResourceType.WOOD));
     }
 }

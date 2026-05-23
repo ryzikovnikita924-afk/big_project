@@ -1,27 +1,31 @@
 package com.example.model;
 
-
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 public class Player {
-    private final String id;
+    private String id;
     private final String name;
     private final Map<ResourceType, Integer> resources;
     private final Set<Cell> capturedCells;
     private int totalTroops;
     private int victories;
     private int population;
+    private int totalGames;
+    private int totalWins;
+
 
     public Player(String name) {
-        this.id = UUID.randomUUID().toString();
+        this(UUID.randomUUID().toString(), name);
+    }
+
+
+    public Player(String id, String name) {
+        this.id = id;
         this.name = name;
         this.resources = new HashMap<>();
         this.capturedCells = new HashSet<>();
-
+        this.totalGames = 0;
+        this.totalWins = 0;
 
         resources.put(ResourceType.GOLD, 100);
         resources.put(ResourceType.WOOD, 50);
@@ -32,45 +36,34 @@ public class Player {
         this.population = 50;
     }
 
-    // Геттеры
+
     public String getId() { return id; }
     public String getName() { return name; }
-    public Set<Cell> getcapturedCells() {return capturedCells;}
+    public Set<Cell> getCapturedCells() { return capturedCells; }  // Переименовано
     public Map<ResourceType, Integer> getResources() { return resources; }
-    public Set<String> getCapturedCellIds(Set<Cell> capturedCells) {
-        Set<String> ids = new HashSet<>();
-        for (Cell cell : capturedCells) {
-            String id = cell.getId();
-            ids.add(id);
-        }
-        return ids;
-    }
     public int getTotalTroops() { return totalTroops; }
     public int getVictories() { return victories; }
     public int getPopulation() { return population; }
+    public int getTotalWins() { return totalWins; }
+    public int getTotalGames() { return totalGames; }
+
+
+    public void setId(String id) { this.id = id; }
+    public void setTotalWins(int wins) { this.totalWins = wins; }
+    public void setTotalGames(int games) { this.totalGames = games; }
+    public void setTotalTroops(int totalTroops) { this.totalTroops = totalTroops; }
+    public void setVictories(int victories) { this.victories = victories; }
+    public void setPopulation(int population) { this.population = population; }
+
 
     public int getResource(ResourceType type) {
         return resources.getOrDefault(type, 0);
     }
 
-    public void setPopulation(int population) {
-        this.population = population;
-    }
-
-    public void addPopulation(int amount) {
-        this.population += amount;
-    }
-
-    public void subtractPopulation(int amount) {
-        this.population = Math.max(0, this.population - amount);
-    }
-
     public void addResource(ResourceType type, int amount) {
         resources.put(type, resources.getOrDefault(type, 0) + amount);
     }
-    public int setTroopsCount(int number){
-        return totalTroops = number;
-    }
+
     public boolean spendResource(ResourceType type, int amount) {
         int current = resources.getOrDefault(type, 0);
         if (current >= amount) {
@@ -79,43 +72,31 @@ public class Player {
         }
         return false;
     }
-    public void setId(String id) {
 
-    }
-
-
-    public void setTotalTroops(int totalTroops) {
-        this.totalTroops = totalTroops;
-    }
-
-
-    public void setVictories(int victories) {
-        this.victories = victories;
-    }
-
-    public boolean hasEnoughResources(Map<ResourceType, Integer> required) {
-        for (Map.Entry<ResourceType, Integer> entry : required.entrySet()) {
-            if (getResource(entry.getKey()) < entry.getValue()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    public void spendResources(Map<ResourceType, Integer> required) {
-        for (Map.Entry<ResourceType, Integer> entry : required.entrySet()) {
-            spendResource(entry.getKey(), entry.getValue());
-        }
-    }
 
     public void addCell(Cell cell) {
         capturedCells.add(cell);
+        cell.setOwnerId(this.id);
     }
 
     public void removeCell(Cell cell) {
         capturedCells.remove(cell);
     }
 
+
+    public Set<String> getCapturedCellIds() {
+        Set<String> ids = new HashSet<>();
+        for (Cell cell : capturedCells) {
+            ids.add(cell.getId());
+        }
+        return ids;
+    }
+
+    public int getTotalCells() {
+        return capturedCells.size();
+    }
+
+    // Методы войск
     public void addTroops(int amount) {
         totalTroops += amount;
     }
@@ -126,33 +107,16 @@ public class Player {
 
     public void addVictory() {
         victories++;
-    }
-
-    public int getTotalCells() {
-        return capturedCells.size();
+        totalWins++;
     }
 
     public boolean isAlive() {
         return !capturedCells.isEmpty();
     }
 
-    public Map<String, Object> toMap() {
-        Map<String, Object> map = new HashMap<>();
-        map.put("id", id);
-        map.put("name", name);
-        map.put("cellsCount", capturedCells.size());
-        map.put("victories", victories);
-        map.put("totalTroops", totalTroops);
-        map.put("population", population);
-        map.put("gold", getResource(ResourceType.GOLD));
-        map.put("wood", getResource(ResourceType.WOOD));
-        map.put("food", getResource(ResourceType.FOOD));
-        return map;
-    }
-
     @Override
     public String toString() {
-        return String.format("Player{name='%s', cells=%d, gold=%d, population=%d}",
-                name, capturedCells.size(), getResource(ResourceType.GOLD), population);
+        return String.format("Player{id='%s', name='%s', cells=%d, gold=%d}",
+                id, name, capturedCells.size(), getResource(ResourceType.GOLD));
     }
 }

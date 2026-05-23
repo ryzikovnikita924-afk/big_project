@@ -2,7 +2,7 @@ provider = "oidc"
 http_address = "0.0.0.0:4180"
 
 client_id = "oauth2-proxy"
-client_secret = "c6Qk9CKH2XhLYhmsYUpN9P63nfZJ5OSd"
+client_secret = "8UQK6oF3SkdGs7TnWTQOKiXeS165O0Ln"
 redirect_url = "http://localhost:4180/oauth2/callback"
 oidc_issuer_url = "http://localhost:8082/realms/geostrat"
 

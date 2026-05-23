@@ -15,6 +15,7 @@ public class AIController {
     private final TurnService turnService;
     private boolean aiEnabled = true;
     private String aiPlayerId = null;
+    private Thread aiThread;
 
     public AIController(AIPlayer aiPlayer, GameWorld gameWorld, TurnService turnService) {
         this.aiPlayer = aiPlayer;
@@ -23,6 +24,16 @@ public class AIController {
 
         // Запускаем AI поток
         startAIThread();
+    }
+
+    public void setAiPlayerId(String aiPlayerId) {
+        this.aiPlayerId = aiPlayerId;
+        System.out.println("🤖 AI Player ID установлен: " + aiPlayerId);
+    }
+
+    public void enableAI(boolean enabled) {
+        this.aiEnabled = enabled;
+        System.out.println("🤖 AI " + (enabled ? "включен" : "выключен"));
     }
 
     @PostMapping("/enable")
@@ -75,13 +86,28 @@ public class AIController {
         return response;
     }
 
+    @GetMapping("/status")
+    public Map<String, Object> getStatus() {
+        Map<String, Object> status = new HashMap<>();
+        status.put("enabled", aiEnabled);
+        status.put("aiPlayerId", aiPlayerId);
+        status.put("tactic", aiPlayer.getCurrentTactic().toString());
+        status.put("currentTurn", turnService.getCurrentPlayer() != null ?
+                turnService.getCurrentPlayer().getName() : "none");
+        return status;
+    }
+
+
     private void startAIThread() {
-        Thread aiThread = new Thread(() -> {
+        aiThread = new Thread(() -> {
+            System.out.println("🤖 AI поток запущен");
             while (true) {
                 try {
-                    Thread.sleep(1000); // Проверяем каждую секунду
+                    Thread.sleep(2000); // Проверяем каждые 2 секунды
 
-                    if (!aiEnabled || aiPlayerId == null) continue;
+                    if (!aiEnabled || aiPlayerId == null) {
+                        continue;
+                    }
 
                     // Проверяем, что сейчас ход AI
                     var currentPlayer = turnService.getCurrentPlayer();
@@ -89,7 +115,9 @@ public class AIController {
                             currentPlayer.getId().equals(aiPlayerId) &&
                             turnService.getState() == TurnService.GameState.WAITING) {
 
-                        // Задержка перед ходом AI
+                        System.out.println("🤖 AI обнаружил свой ход! Начинает...");
+
+                        // Небольшая задержка перед ходом AI
                         Thread.sleep(1000);
 
                         // AI делает ход
@@ -98,7 +126,11 @@ public class AIController {
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    System.out.println("🤖 AI поток остановлен");
                     break;
+                } catch (Exception e) {
+                    System.err.println("Ошибка в AI потоке: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
         });

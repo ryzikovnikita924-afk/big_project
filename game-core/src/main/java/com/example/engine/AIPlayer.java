@@ -1,8 +1,6 @@
 package com.example.engine;
 
-import com.example.model.Cell;
-import com.example.model.Player;
-import com.example.model.ResourceType;
+import com.example.model.*;
 import com.example.service.TurnService;
 import com.example.world.GameWorld;
 import org.springframework.stereotype.Component;
@@ -14,11 +12,7 @@ import java.util.stream.Collectors;
 public class AIPlayer {
 
     public enum AITactic {
-        AGGRESSIVE,   // Агрессивный - атакует как можно чаще
-        DEFENSIVE,    // Защитный - укрепляет свои клетки
-        ECONOMIC,     // Экономический - копит ресурсы
-        BALANCED,     // Сбалансированный
-        RANDOM        // Случайный
+        AGGRESSIVE, DEFENSIVE, ECONOMIC, BALANCED, RANDOM
     }
 
     private final GameWorld gameWorld;
@@ -36,227 +30,204 @@ public class AIPlayer {
         System.out.println("🤖 AI тактика изменена на: " + tactic);
     }
 
+    public AITactic getCurrentTactic() {
+        return this.tactic;
+    }
+
     public void makeTurn(String aiPlayerId) {
         System.out.println("\n🤖 AI (" + getPlayerName(aiPlayerId) + ") начинает ход. Тактика: " + tactic);
 
         try {
-            // Начинаем ход
+            Player aiPlayer = gameWorld.getPlayer(aiPlayerId);
+            if (aiPlayer == null) {
+                System.out.println("❌ AI игрок не найден!");
+                return;
+            }
+
+            System.out.println("📊 AI состояние до хода:");
+            System.out.println("  - Клеток: " + aiPlayer.getCapturedCells().size());
+            System.out.println("  - Войск: " + aiPlayer.getTotalTroops());
+            System.out.println("  - Золото: " + aiPlayer.getResource(ResourceType.GOLD));
+            System.out.println("  - Дерево: " + aiPlayer.getResource(ResourceType.WOOD));
+            System.out.println("  - Еда: " + aiPlayer.getResource(ResourceType.FOOD));
+
+            if (turnService.getState() != TurnService.GameState.WAITING) {
+                System.out.println("❌ AI не может начать ход. Состояние игры: " + turnService.getState());
+                return;
+            }
+
             if (!turnService.startTurn(aiPlayerId)) {
                 System.out.println("❌ AI не может начать ход!");
                 return;
             }
 
-            // Небольшая задержка для имитации "обдумывания"
             Thread.sleep(500);
 
-            // Получаем текущего игрока
-            Player aiPlayer = gameWorld.getPlayer(aiPlayerId);
+            aiPlayer = gameWorld.getPlayer(aiPlayerId);
             if (aiPlayer == null) {
-                System.out.println("❌ AI игрок не найден!");
+                System.out.println("❌ AI игрок не найден после начала хода!");
                 turnService.endTurn(aiPlayerId);
                 return;
             }
 
-            // Выполняем действия в зависимости от тактики
-            switch (tactic) {
-                case AGGRESSIVE:
-                    aggressiveMove(aiPlayerId);
-                    break;
-                case DEFENSIVE:
-                    defensiveMove(aiPlayerId);
-                    break;
-                case ECONOMIC:
-                    economicMove(aiPlayerId);
-                    break;
-                case RANDOM:
-                    randomMove(aiPlayerId);
-                    break;
-                default:
-                    balancedMove(aiPlayerId);
-                    break;
+            System.out.println("📊 AI состояние после начала хода:");
+            System.out.println("  - Клеток: " + aiPlayer.getCapturedCells().size());
+            System.out.println("  - Войск: " + aiPlayer.getTotalTroops());
+            System.out.println("  - Золото: " + aiPlayer.getResource(ResourceType.GOLD));
+            System.out.println("  - Дерево: " + aiPlayer.getResource(ResourceType.WOOD));
+            System.out.println("  - Еда: " + aiPlayer.getResource(ResourceType.FOOD));
+
+            List<Cell> myCells = getAICells(aiPlayerId);
+            System.out.println("📊 Клетки AI: " + myCells.size());
+
+            for (Cell cell : myCells) {
+                System.out.println("  - Клетка AI [" + cell.getX() + "," + cell.getY() + "] " + cell.getTerrain());
             }
 
-            // Небольшая задержка перед завершением хода
-            Thread.sleep(500);
+            if (myCells.isEmpty()) {
+                System.out.println("⚠️ У AI нет клеток!");
+                Thread.sleep(500);
+                turnService.endTurn(aiPlayerId);
+                return;
+            }
 
-            // Завершаем ход
+            int availableTroops = aiPlayer.getTotalTroops();
+            int availableGold = aiPlayer.getResource(ResourceType.GOLD);
+            int availableWood = aiPlayer.getResource(ResourceType.WOOD);
+
+            System.out.println("📊 Доступно: войск=" + availableTroops + ", золота=" + availableGold + ", дерева=" + availableWood);
+
+            // Находим все возможные цели
+            List<Cell> allNeighbors = findAllNeighbors(myCells);
+            List<Cell> enemyTargets = allNeighbors.stream()
+                    .filter(c -> c.getOwnerId() != null && !c.getOwnerId().equals(aiPlayerId) && !c.isWater())
+                    .collect(Collectors.toList());
+            List<Cell> neutralTargets = allNeighbors.stream()
+                    .filter(c -> c.getOwnerId() == null && !c.isWater())
+                    .collect(Collectors.toList());
+
+            System.out.println("🎯 Доступные цели: вражеских=" + enemyTargets.size() + ", нейтральных=" + neutralTargets.size());
+
+            for (Cell target : enemyTargets) {
+                System.out.println("  - Вражеская клетка [" + target.getX() + "," + target.getY() + "] " + target.getTerrain());
+            }
+            for (Cell target : neutralTargets) {
+                System.out.println("  - Нейтральная клетка [" + target.getX() + "," + target.getY() + "] " + target.getTerrain());
+            }
+
+            // Сначала пробуем атаковать (приоритет)
+            boolean attacked = false;
+
+            if (!enemyTargets.isEmpty()) {
+                Cell target = selectBestTarget(enemyTargets);
+                int conquestCost = target.getConquestCost() + 5;
+                if (availableTroops >= conquestCost) {
+                    System.out.println("🤖 AI атакует вражескую клетку [" + target.getX() + "," + target.getY() +
+                            "] стоимостью " + conquestCost + " войск");
+                    gameWorld.executeInstantAttack(myCells, target, aiPlayerId);
+                    attacked = true;
+                } else {
+                    System.out.println("🤖 AI недостаточно войск для атаки врага! Нужно: " + conquestCost);
+                }
+            }
+
+            // Если не атаковали врага, пробуем захватить нейтральную клетку
+            if (!attacked && !neutralTargets.isEmpty()) {
+                Cell target = selectBestTarget(neutralTargets);
+                int conquestCost = target.getConquestCost();
+                if (availableTroops >= conquestCost) {
+                    System.out.println("🤖 AI атакует нейтральную клетку [" + target.getX() + "," + target.getY() +
+                            "] стоимостью " + conquestCost + " войск");
+                    gameWorld.executeInstantAttack(myCells, target, aiPlayerId);
+                    attacked = true;
+                } else {
+                    System.out.println("🤖 AI недостаточно войск для атаки нейтрала! Нужно: " + conquestCost);
+                }
+            }
+
+            // Если не атаковали, пробуем построить здание
+            if (!attacked) {
+                tryBuildBuilding(aiPlayerId, myCells, availableGold, availableWood);
+            }
+
+            Thread.sleep(500);
             turnService.endTurn(aiPlayerId);
             System.out.println("✅ AI завершил ход");
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            System.err.println("AI ход прерван: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Ошибка в AI ходе: " + e.getMessage());
+            e.printStackTrace();
+            try {
+                turnService.endTurn(aiPlayerId);
+            } catch (Exception ex) {
+                System.err.println("Не удалось завершить ход AI: " + ex.getMessage());
+            }
         }
     }
 
-    // Агрессивная тактика - атакует как можно чаще
-    private void aggressiveMove(String aiPlayerId) {
-        List<Cell> myCells = getAICells(aiPlayerId);
-        if (myCells.isEmpty()) return;
-
-        // Находим все возможные цели для атаки
-        List<Cell> targets = findAttackTargets(aiPlayerId, myCells);
-
-        if (!targets.isEmpty()) {
-            // Атакуем наиболее слабую цель
-            targets.sort(Comparator.comparingInt(Cell::getTroopsCount));
-            Cell target = targets.get(0);
-
-            System.out.println("🤖 AI атакует клетку [" + target.getX() + "," + target.getY() +
-                    "] с защитой " + target.getDefenseBonus());
-
-            // Вызываем executeInstantAttack с моими клетками и целевой клеткой
-            gameWorld.executeInstantAttack(myCells, target, aiPlayerId);
-        } else {
-            System.out.println("🤖 AI (агрессивный) нет целей для атаки");
+    private List<Cell> findAllNeighbors(List<Cell> myCells) {
+        Set<Cell> allNeighbors = new HashSet<>();
+        for (Cell cell : myCells) {
+            List<Cell> neighbors = gameWorld.getNeighbors(cell);
+            allNeighbors.addAll(neighbors);
         }
+        // Убираем свои клетки из списка соседей
+        allNeighbors.removeAll(myCells);
+        return new ArrayList<>(allNeighbors);
     }
 
-    // Защитная тактика - редко атакует, только при явном преимуществе
-    private void defensiveMove(String aiPlayerId) {
-        List<Cell> myCells = getAICells(aiPlayerId);
-        if (myCells.isEmpty()) return;
+    private Cell selectBestTarget(List<Cell> targets) {
+        // Выбираем цель с наименьшей стоимостью захвата
+        return targets.stream()
+                .min(Comparator.comparingInt(Cell::getConquestCost))
+                .orElse(null);
+    }
 
-        // Атакуем только если у нас больше войск, чем у защитника
-        List<Cell> targets = findAttackTargets(aiPlayerId, myCells);
+    private boolean tryBuildBuilding(String aiPlayerId, List<Cell> myCells, int gold, int wood) {
+        List<Cell> buildableCells = myCells.stream()
+                .filter(cell -> !cell.hasBuilding())
+                .collect(Collectors.toList());
 
-        Player attacker = gameWorld.getPlayer(aiPlayerId);
-        if (attacker == null) return;
+        if (buildableCells.isEmpty()) {
+            System.out.println("🏗️ Нет свободных клеток для строительства");
+            return false;
+        }
 
-        for (Cell target : targets) {
-            // Проверяем, что у нас больше войск, чем защита клетки
-            if (attacker.getTotalTroops() > target.getDefenseBonus() * 2) {
-                System.out.println("🤖 AI (защитный) атакует с большим преимуществом");
-                gameWorld.executeInstantAttack(myCells, target, aiPlayerId);
-                return;
+        // Приоритеты строительства
+        BuildingType[] priorities = {BuildingType.SAWMILL, BuildingType.FARM, BuildingType.BARRACKS, BuildingType.PORT};
+
+        for (BuildingType building : priorities) {
+            Cell targetCell = buildableCells.stream()
+                    .filter(cell -> cell.canBuild(building))
+                    .findFirst()
+                    .orElse(null);
+
+            if (targetCell != null) {
+                int costGold = building.getBuildCostGold();
+                int costWood = building.getBuildCostWood();
+
+                if (gold >= costGold && wood >= costWood) {
+                    System.out.println("🏗️ AI строит " + building.getDisplayName() +
+                            " на клетке [" + targetCell.getX() + "," + targetCell.getY() + "]");
+                    gameWorld.buildBuilding(targetCell, building, aiPlayerId);
+                    return true;
+                }
             }
         }
 
-        System.out.println("🤖 AI (защитный) не нашел выгодных целей для атаки");
+        return false;
     }
-
-    // Экономическая тактика - атакует только нейтральные клетки
-    private void economicMove(String aiPlayerId) {
-        Player aiPlayer = gameWorld.getPlayer(aiPlayerId);
-        if (aiPlayer == null) return;
-
-        System.out.println("🤖 AI копит ресурсы: Золото=" + aiPlayer.getResource(ResourceType.GOLD) +
-                ", Дерево=" + aiPlayer.getResource(ResourceType.WOOD) +
-                ", Еда=" + aiPlayer.getResource(ResourceType.FOOD));
-
-        // Атакуем только соседние нейтральные клетки
-        List<Cell> myCells = getAICells(aiPlayerId);
-        List<Cell> neutralTargets = findNeutralTargets(aiPlayerId, myCells);
-
-        if (!neutralTargets.isEmpty()) {
-            Cell target = neutralTargets.get(0);
-            System.out.println("🤖 AI (экономический) атакует нейтральную клетку");
-            gameWorld.executeInstantAttack(myCells, target, aiPlayerId);
-        } else {
-            System.out.println("🤖 AI (экономический) нет нейтральных клеток для атаки");
-        }
-    }
-
-    // Сбалансированная тактика
-    private void balancedMove(String aiPlayerId) {
-        List<Cell> myCells = getAICells(aiPlayerId);
-        if (myCells.isEmpty()) return;
-
-        Player attacker = gameWorld.getPlayer(aiPlayerId);
-        if (attacker == null) return;
-
-        // Если есть выгодные цели - атакуем
-        List<Cell> targets = findAttackTargets(aiPlayerId, myCells);
-
-        for (Cell target : targets) {
-            // Проверяем, что у нас больше войск, чем у защитника
-            if (attacker.getTotalTroops() > target.getDefenseBonus() + 10) {
-                System.out.println("🤖 AI (сбалансированный) атакует выгодную цель");
-                gameWorld.executeInstantAttack(myCells, target, aiPlayerId);
-                return;
-            }
-        }
-
-        // Иначе атакуем нейтральные клетки
-        List<Cell> neutralTargets = findNeutralTargets(aiPlayerId, myCells);
-        if (!neutralTargets.isEmpty()) {
-            Cell target = neutralTargets.get(0);
-            System.out.println("🤖 AI (сбалансированный) атакует нейтральную клетку");
-            gameWorld.executeInstantAttack(myCells, target, aiPlayerId);
-        } else {
-            System.out.println("🤖 AI (сбалансированный) нет целей для атаки");
-        }
-    }
-
-    // Случайная тактика
-    private void randomMove(String aiPlayerId) {
-        List<Cell> myCells = getAICells(aiPlayerId);
-        if (myCells.isEmpty()) return;
-
-        int action = random.nextInt(3);
-
-        switch (action) {
-            case 0: // Атака врага
-                List<Cell> targets = findAttackTargets(aiPlayerId, myCells);
-                if (!targets.isEmpty()) {
-                    Cell target = targets.get(random.nextInt(targets.size()));
-                    System.out.println("🤖 AI (случайный) атакует вражескую клетку");
-                    gameWorld.executeInstantAttack(myCells, target, aiPlayerId);
-                } else {
-                    System.out.println("🤖 AI (случайный) нет вражеских целей для атаки");
-                }
-                break;
-            case 1: // Атака нейтральной клетки
-                List<Cell> neutralTargets = findNeutralTargets(aiPlayerId, myCells);
-                if (!neutralTargets.isEmpty()) {
-                    Cell target = neutralTargets.get(random.nextInt(neutralTargets.size()));
-                    System.out.println("🤖 AI (случайный) атакует нейтральную клетку");
-                    gameWorld.executeInstantAttack(myCells, target, aiPlayerId);
-                }
-                break;
-            case 2: // Ничего не делать
-                System.out.println("🤖 AI (случайный) пропускает ход");
-                break;
-        }
-    }
-
-    // Вспомогательные методы
 
     private List<Cell> getAICells(String aiPlayerId) {
-        return gameWorld.getCells().values().stream()
-                .filter(cell -> aiPlayerId.equals(cell.getOwnerId()) && !cell.isWater())
+        Player player = gameWorld.getPlayer(aiPlayerId);
+        if (player == null) return new ArrayList<>();
+
+        return player.getCapturedCells().stream()
+                .filter(cell -> !cell.isWater())
                 .collect(Collectors.toList());
-    }
-
-    private List<Cell> findAttackTargets(String aiPlayerId, List<Cell> myCells) {
-        Set<Cell> targets = new HashSet<>();
-
-        for (Cell myCell : myCells) {
-            List<Cell> neighbors = gameWorld.getNeighbors(myCell);
-            for (Cell neighbor : neighbors) {
-                if (neighbor.getOwnerId() != null &&
-                        !neighbor.getOwnerId().equals(aiPlayerId) &&
-                        !neighbor.isWater()) {
-                    targets.add(neighbor);
-                }
-            }
-        }
-
-        return new ArrayList<>(targets);
-    }
-
-    private List<Cell> findNeutralTargets(String aiPlayerId, List<Cell> myCells) {
-        Set<Cell> targets = new HashSet<>();
-
-        for (Cell myCell : myCells) {
-            List<Cell> neighbors = gameWorld.getNeighbors(myCell);
-            for (Cell neighbor : neighbors) {
-                if (neighbor.getOwnerId() == null && !neighbor.isWater()) {
-                    targets.add(neighbor);
-                }
-            }
-        }
-
-        return new ArrayList<>(targets);
     }
 
     private String getPlayerName(String playerId) {

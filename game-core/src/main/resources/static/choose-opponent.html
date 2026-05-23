@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Выбор противника - GeoStrat</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css"/>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="/js/auth.js"></script>
+    <style>
+        .loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loader-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-base-200">
+<div id="loader" class="loader" style="display: none;">
+    <div class="loader-spinner"></div>
+</div>
+
+<div class="container mx-auto px-4 py-8">
+    <div class="card max-w-md mx-auto bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-2xl">Выберите противника</h2>
+
+            <div class="divider">AI Сложность</div>
+
+            <button onclick="startGame('AGGRESSIVE')" class="btn btn-error mb-2">
+                🔥 Агрессивный AI
+            </button>
+            <button onclick="startGame('DEFENSIVE')" class="btn btn-info mb-2">
+                🛡️ Защитный AI
+            </button>
+            <button onclick="startGame('ECONOMIC')" class="btn btn-success mb-2">
+                💰 Экономический AI
+            </button>
+            <button onclick="startGame('BALANCED')" class="btn btn-warning mb-2">
+                ⚖️ Сбалансированный AI
+            </button>
+            <button onclick="startGame('RANDOM')" class="btn btn-secondary mb-2">
+                🎲 Случайный AI
+            </button>
+
+            <div class="divider">Мультиплеер</div>
+            <button onclick="alert('В разработке')" class="btn btn-outline" disabled>
+                👥 PvP (Скоро)
+            </button>
+
+            <div class="card-actions justify-end mt-4">
+                <button onclick="window.location.href='/'" class="btn btn-ghost">Назад</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const GameApi = {
+        async request(endpoint, options = {}) {
+            const response = await fetch(`/api/game${endpoint}`, {
+                ...options,
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return await response.json();
+        },
+        startVsAI: (playerId, playerName, difficulty) => GameApi.request('/start-vs-ai', {
+            method: 'POST',
+            body: JSON.stringify({ playerId, playerName, difficulty })
+        })
+    };
+
+    async function startGame(difficulty) {
+        const loader = document.getElementById('loader');
+        loader.style.display = 'flex';
+
+        try {
+            // Получаем информацию о пользователе
+            const { status, body } = await window.AuthApi.getCurrentUser();
+
+            let playerId = null;
+            let playerName = null;
+
+            try {
+                const userResponse = await fetch('/api/user/me', { credentials: 'include' });
+                if (userResponse.ok) {
+                    const userData = await userResponse.json();
+                    if (userData.authenticated) {
+                        playerId = userData.id;
+                        playerName = userData.username || userData.name || window.AuthApi.extractDisplayName(body.userInfo);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to get user details:", error);
+                playerId = body.userInfo?.user || body.userInfo?.email;
+                playerName = window.AuthApi.extractDisplayName(body.userInfo);
+            }
+
+            if (!playerId) {
+                throw new Error('ID игрока не найден');
+            }
+
+            console.log("Starting game with:", { playerId, playerName, difficulty });
+
+            const result = await GameApi.startVsAI(playerId, playerName, difficulty);
+
+            if (result.success) {
+                // Перенаправляем на главную страницу
+                window.location.href = '/';
+            } else {
+                alert('Ошибка: ' + result.message);
+                loader.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Start game error:', error);
+            alert('Ошибка запуска игры: ' + error.message);
+            loader.style.display = 'none';
+        }
+    }
+</script>
+</body>
+</html>

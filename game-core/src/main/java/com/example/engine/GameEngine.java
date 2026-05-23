@@ -9,13 +9,13 @@ public class GameEngine {
     private static final int ATTACK_DURATION_MS = 5000;
     private static final int PRODUCTION_INTERVAL_MS = 10000;
 
-
     public boolean areNeighbors(Cell a, Cell b) {
         if (a == null || b == null) return false;
 
         int dx = Math.abs(a.getX() - b.getX());
         int dy = Math.abs(a.getY() - b.getY());
 
+        // Соседними считаются клетки по горизонтали, вертикали и диагонали
         if (dx == 0 && dy == 1) return true;
         if (dx == 1 && dy == 0) return true;
         if (dx == 1 && dy == 1) return true;
@@ -23,43 +23,25 @@ public class GameEngine {
         return false;
     }
 
+    public boolean canAttack(List<Cell> fromCells, Cell targetCell) {
+        if (fromCells == null || fromCells.isEmpty() || targetCell == null) return false;
 
-    public boolean canAttack(List<Cell> from, Cell to) {
-        if (from == null || to == null) return false;
-        if (to.isWater()) return false;
-        Cell cell= from.get(0);
-        if (cell.getOwnerId().equals(to.getOwnerId())) return false;
+        // Нельзя атаковать воду
+        if (targetCell.isWater()) return false;
 
+        // Нельзя атаковать свои клетки
+        String ownerId = fromCells.get(0).getOwnerId();
+        if (ownerId != null && ownerId.equals(targetCell.getOwnerId())) return false;
 
-        return true;
-    }
-
-
-    public BattleResult resolveBattle(Player attacker, Cell defender) {
-        int attackerPower = attacker.getTotalTroops();
-        int defenderPower = defender.getDefenseBonus();
-
-        System.out.printf("Битва: %d vs %d (бонус защиты: %.1f)%n",
-                attackerPower, defenderPower, defender.getTerrain().getDefenseBonus());
-
-        if (attackerPower > defenderPower) {
-
-            int remainingTroops = attackerPower - defenderPower;
-            int defenderLosses = defender.getTroopsCount();
-
-            return new BattleResult(true, remainingTroops, defender, defenderLosses);
-        } else {
-
-            int defenderLosses = defender.getTroopsCount();
-            int remainingDefender = defenderPower - attackerPower;
-            defender.setTroopsCount(remainingDefender);
-
-            return new BattleResult(false, 0, defender, attackerPower);
+        // Проверяем, есть ли среди атакующих клеток хотя бы одна, соседняя с целью
+        for (Cell fromCell : fromCells) {
+            if (areNeighbors(fromCell, targetCell)) {
+                return true;
+            }
         }
+
+        return false;
     }
-
-
-
 
     public int calculateResourceProduction(Cell cell) {
         if (cell.isNeutral() || cell.isWater()) return 0;

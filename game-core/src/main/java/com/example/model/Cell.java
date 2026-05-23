@@ -1,7 +1,6 @@
 package com.example.model;
 
 import java.util.Objects;
-import java.util.UUID;
 
 public class Cell {
     private final String id;
@@ -9,20 +8,18 @@ public class Cell {
     private final int y;
     private final TerrainType terrain;
     private String ownerId;
-    private int troopsCount;
     private int level;
     private int productionRate;
-    private long lastUpdatedAt;
+    private BuildingType building;  // Добавлено: здание на клетке
 
     public Cell(int x, int y, TerrainType terrain) {
         this.id = generateId(x, y);
         this.x = x;
         this.y = y;
         this.terrain = terrain;
-        this.troopsCount = terrain == TerrainType.WATER ? 0 : 10;
         this.level = 1;
         this.productionRate = calculateBaseProduction();
-        this.lastUpdatedAt = System.currentTimeMillis();
+        this.building = BuildingType.NONE;
     }
 
     private static String generateId(int x, int y) {
@@ -40,29 +37,47 @@ public class Cell {
         }
     }
 
-    // Геттеры и сеттеры
     public String getId() { return id; }
     public int getX() { return x; }
     public int getY() { return y; }
     public TerrainType getTerrain() { return terrain; }
     public String getOwnerId() { return ownerId; }
     public void setOwnerId(String ownerId) { this.ownerId = ownerId; }
-    public int getTroopsCount() { return troopsCount; }
-    public void setTroopsCount(int troopsCount) { this.troopsCount = troopsCount; }
     public int getLevel() { return level; }
     public void setLevel(int level) { this.level = level; }
     public int getProductionRate() { return productionRate; }
-    public long getLastUpdatedAt() { return lastUpdatedAt; }
-    public void setLastUpdatedAt(long lastUpdatedAt) { this.lastUpdatedAt = lastUpdatedAt; }
+    public BuildingType getBuilding() { return building; }
+    public void setBuilding(BuildingType building) { this.building = building; }
 
     public boolean isNeutral() { return ownerId == null; }
     public boolean isWater() { return terrain == TerrainType.WATER; }
+    public boolean hasBuilding() { return building != BuildingType.NONE; }
 
-    // Текущее производство ресурсов (уровень влияет на производство)
     public int getCurrentProduction() {
-        return productionRate * level;
+        int base = productionRate * level;
+        // Добавляем бонус от здания
+        if (building != null) {
+            base += building.getGoldBonus() + building.getWoodBonus() + building.getFoodBonus();
+        }
+        return base;
     }
 
+    public int getGoldBonus() {
+        return building != null ? building.getGoldBonus() : 0;
+    }
+
+    public int getWoodBonus() {
+        return building != null ? building.getWoodBonus() : 0;
+    }
+
+    public int getFoodBonus() {
+        return building != null ? building.getFoodBonus() : 0;
+    }
+
+    public int getTroopBonus() {
+        // Казармы дают +5 войск в ход
+        return building == BuildingType.BARRACKS ? 5 : 0;
+    }
 
     public boolean upgrade() {
         if (level >= 5) return false;
@@ -70,12 +85,10 @@ public class Cell {
         return true;
     }
 
-
     public boolean canUpgrade() {
         return level < 5;
     }
 
-    // Стоимость следующего улучшения
     public int getUpgradeCostGold() {
         return 100 * level;
     }
@@ -84,19 +97,35 @@ public class Cell {
         return 50 * level;
     }
 
-    public int getDefenseBonus() {
-        // Бонус защиты увеличивается с уровнем клетки
-        return (int)(troopsCount * terrain.getDefenseBonus() * (1 + level * 0.1));
+    public int getConquestCost() {
+        if (isWater()) return Integer.MAX_VALUE;
+
+        if (isNeutral()) {
+            return 0;
+        }
+
+        int baseCost = 10;
+        switch (terrain) {
+            case CITY: baseCost = 15; break;
+            case FOREST: baseCost = 12; break;
+            case MOUNTAIN: baseCost = 20; break;
+            case PLAIN: baseCost = 8; break;
+        }
+        return baseCost * level;
     }
 
-
-    public void addTroops(int amount) {
-        this.troopsCount += amount;
+    public boolean canBuild(BuildingType buildingType) {
+        if (building != BuildingType.NONE) return false; // Уже есть здание
+        if (ownerId == null) return false; // Нейтральную клетку нельзя улучшать
+        return buildingType.canBuildOn(terrain);
     }
 
+    public int getBuildCostGold(BuildingType buildingType) {
+        return buildingType.getBuildCostGold();
+    }
 
-    public void takeDamage(int damage) {
-        this.troopsCount = Math.max(0, this.troopsCount - damage);
+    public int getBuildCostWood(BuildingType buildingType) {
+        return buildingType.getBuildCostWood();
     }
 
     @Override
@@ -112,7 +141,7 @@ public class Cell {
 
     @Override
     public String toString() {
-        return String.format("Cell[%d,%d] owner=%s troops=%d level=%d terrain=%s",
-                x, y, ownerId != null ? ownerId : "neutral", troopsCount, level, terrain);
+        return String.format("Cell[%d,%d] owner=%s level=%d terrain=%s building=%s",
+                x, y, ownerId != null ? ownerId : "neutral", level, terrain, building.getDisplayName());
     }
 }

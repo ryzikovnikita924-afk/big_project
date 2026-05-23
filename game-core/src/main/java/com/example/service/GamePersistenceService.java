@@ -42,7 +42,7 @@ public class GamePersistenceService {
 
     public void finishGame(Player winner) {
         for (Player player : gameWorld.getPlayers().values()) {
-            int cellsCaptured = player.getcapturedCells().size();
+            int cellsCaptured = player.getCapturedCells().size();
             int troopsKilled = calculateTroopsKilled(player);
             boolean isWinner = winner != null && winner.getId().equals(player.getId());
             int turnsPlayed = turnService.getTurnNumber();
@@ -97,7 +97,6 @@ public class GamePersistenceService {
             Cell cell = new Cell(cellSnapshot.getX(), cellSnapshot.getY(),
                     TerrainType.valueOf(cellSnapshot.getTerrain()));
             cell.setOwnerId(cellSnapshot.getOwnerId());
-            cell.setTroopsCount(cellSnapshot.getTroopsCount());
             cell.setLevel(cellSnapshot.getLevel());
             gameWorld.addCell(cell);
         }
@@ -123,18 +122,20 @@ public class GamePersistenceService {
     }
 
     private Player restorePlayer(PlayerSnapshot snapshot) {
-        Player player = new Player(snapshot.getName());
+        Player player = new Player(snapshot.getId(), snapshot.getName());
 
-        player.setId(snapshot.getId());
         for (Map.Entry<String, Integer> resource : snapshot.getResources().entrySet()) {
             player.addResource(ResourceType.valueOf(resource.getKey()), resource.getValue());
         }
         for (String cellId : snapshot.getCapturedCellIds()) {
-
-            player.addCell(gameWorld.getCell(cellId));
+            Cell cell = gameWorld.getCell(cellId);
+            if (cell != null) {
+                player.addCell(cell);
+            }
         }
         player.setTotalTroops(snapshot.getTotalTroops());
         player.setVictories(snapshot.getVictories());
+        player.setPopulation(snapshot.getPopulation());
         return player;
     }
 

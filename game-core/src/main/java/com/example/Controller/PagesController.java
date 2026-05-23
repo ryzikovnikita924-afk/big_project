@@ -12,8 +12,10 @@ public class PagesController implements WebMvcConfigurer {
 
     @Override
     public void addViewControllers(@NonNull ViewControllerRegistry registry) {
-
-
         registry.addViewController("/").setViewName("forward:/index.html");
+        registry.addViewController("/login").setViewName("forward:/login.html");
+        registry.addViewController("/game").setViewName("forward:/index.html");
+
+
     }
 }

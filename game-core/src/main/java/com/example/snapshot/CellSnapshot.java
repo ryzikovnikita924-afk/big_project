@@ -12,7 +12,6 @@ public class CellSnapshot implements Serializable {
     private int y;
     private String terrain;
     private String ownerId;
-    private int troopsCount;
     private int level;
     private boolean water;
 
@@ -24,7 +23,6 @@ public class CellSnapshot implements Serializable {
         this.y = cell.getY();
         this.terrain = cell.getTerrain().name();
         this.ownerId = cell.getOwnerId();
-        this.troopsCount = cell.getTroopsCount();
         this.level = cell.getLevel();
         this.water = cell.isWater();
     }
@@ -44,9 +42,6 @@ public class CellSnapshot implements Serializable {
 
     public String getOwnerId() { return ownerId; }
     public void setOwnerId(String ownerId) { this.ownerId = ownerId; }
-
-    public int getTroopsCount() { return troopsCount; }
-    public void setTroopsCount(int troopsCount) { this.troopsCount = troopsCount; }
 
     public int getLevel() { return level; }
     public void setLevel(int level) { this.level = level; }
