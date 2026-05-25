@@ -115,7 +115,7 @@ public class AIPlayer {
                 System.out.println("  - Нейтральная клетка [" + target.getX() + "," + target.getY() + "] " + target.getTerrain());
             }
 
-            // Сначала пробуем атаковать (приоритет)
+
             boolean attacked = false;
 
             if (!enemyTargets.isEmpty()) {
@@ -145,7 +145,7 @@ public class AIPlayer {
                 }
             }
 
-            // Если не атаковали, пробуем построить здание
+
             if (!attacked) {
                 tryBuildBuilding(aiPlayerId, myCells, availableGold, availableWood);
             }
@@ -174,13 +174,13 @@ public class AIPlayer {
             List<Cell> neighbors = gameWorld.getNeighbors(cell);
             allNeighbors.addAll(neighbors);
         }
-        // Убираем свои клетки из списка соседей
+
         allNeighbors.removeAll(myCells);
         return new ArrayList<>(allNeighbors);
     }
 
     private Cell selectBestTarget(List<Cell> targets) {
-        // Выбираем цель с наименьшей стоимостью захвата
+
         return targets.stream()
                 .min(Comparator.comparingInt(Cell::getConquestCost))
                 .orElse(null);

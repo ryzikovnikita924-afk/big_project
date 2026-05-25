@@ -3,11 +3,13 @@ package com.example.Controller;
 import com.example.entity.PlayerEntity;
 import com.example.model.*;
 import com.example.service.GamePersistenceService;
+import com.example.service.StatisticsService;
 import com.example.service.TurnService;
 import com.example.world.GameWorld;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/api/game")
@@ -16,23 +18,50 @@ public class GameController {
     private final GameWorld gameWorld;
     private final TurnService turnService;
     private final GamePersistenceService gamePersistenceService;
-    private String currentPlayerId;
+    private final StatisticsService statisticsService;
+
+    private final Map<String, String> userCurrentPlayerIds = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> userStatisticsUpdated = new ConcurrentHashMap<>();
 
     public GameController(GameWorld gameWorld,
                           TurnService turnService,
-                          GamePersistenceService gamePersistenceService) {
+                          GamePersistenceService gamePersistenceService,
+                          StatisticsService statisticsService) {
         this.gameWorld = gameWorld;
         this.turnService = turnService;
         this.gamePersistenceService = gamePersistenceService;
+        this.statisticsService = statisticsService;
+    }
+
+    private String getCurrentUserId(HttpServletRequest request) {
+        String userId = (String) request.getSession().getAttribute("userId");
+        if (userId == null) {
+            userId = "anonymous_" + System.currentTimeMillis();
+            request.getSession().setAttribute("userId", userId);
+        }
+        System.out.println("📌 Current userId: " + userId);
+        return userId;
+    }
+
+    private String getCurrentPlayerId(String userId) {
+        return userCurrentPlayerIds.get(userId);
+    }
+
+    private boolean isStatisticsUpdated(String userId) {
+        return userStatisticsUpdated.getOrDefault(userId, false);
+    }
+
+    private void setStatisticsUpdated(String userId, boolean updated) {
+        userStatisticsUpdated.put(userId, updated);
     }
 
     @GetMapping("/map")
-    public Map<String, Object> getMap() {
+    public Map<String, Object> getMap(HttpServletRequest request) {
+        String userId = getCurrentUserId(request);
+        String currentPlayerId = getCurrentPlayerId(userId);
+
         Map<String, Object> result = new HashMap<>();
         List<Map<String, Object>> cells = new ArrayList<>();
-
-        System.out.println("=== GET /api/game/map ===");
-        System.out.println("Total cells in world: " + gameWorld.getCells().size());
 
         for (Cell cell : gameWorld.getCells().values()) {
             Map<String, Object> cellData = new HashMap<>();
@@ -57,6 +86,10 @@ public class GameController {
             playerData.put("name", player.getName());
             playerData.put("totalTroops", player.getTotalTroops());
             playerData.put("cellsCount", player.getCapturedCells().size());
+
+            PlayerEntity dbPlayer = statisticsService.getPlayerById(player.getId());
+            playerData.put("totalWins", dbPlayer != null ? dbPlayer.getTotalWins() : 0);
+            playerData.put("totalGames", dbPlayer != null ? dbPlayer.getTotalGames() : 0);
             playersList.add(playerData);
         }
         result.put("players", playersList);
@@ -65,8 +98,9 @@ public class GameController {
     }
 
     @GetMapping("/state")
-    public Map<String, Object> getGameState() {
-        System.out.println("=== GET /api/game/state ===");
+    public Map<String, Object> getGameState(HttpServletRequest request) {
+        String userId = getCurrentUserId(request);
+        String currentPlayerId = getCurrentPlayerId(userId);
 
         Map<String, Object> state = new HashMap<>();
 
@@ -85,18 +119,22 @@ public class GameController {
             state.put("myCells", 0);
             state.put("turn", turnService.getTurnNumber());
             state.put("hasCapturedThisTurn", false);
+
+            if (!isStatisticsUpdated(userId) && winner != null) {
+                updateWinnerStatistics(winner);
+                for (Player player : gameWorld.getPlayers().values()) {
+                    if (!player.getId().equals(winner.getId())) {
+                        updateLoserStatistics(player);
+                    }
+                }
+                setStatisticsUpdated(userId, true);
+            }
             return state;
         }
 
         Player turnOwner = turnService.getCurrentPlayer();
         Player winner = gameWorld.getWinner();
         Player myPlayer = currentPlayerId != null ? gameWorld.getPlayer(currentPlayerId) : null;
-
-        System.out.println("Current player ID from TurnService: " + (turnOwner != null ? turnOwner.getId() : "null"));
-        System.out.println("My player ID from GameController: " + currentPlayerId);
-        System.out.println("My player object: " + (myPlayer != null ? myPlayer.getName() : "null"));
-        System.out.println("My player cells: " + (myPlayer != null ? myPlayer.getCapturedCells().size() : 0));
-        System.out.println("My player troops: " + (myPlayer != null ? myPlayer.getTotalTroops() : 0));
 
         state.put("currentTurnPlayer", turnOwner != null ? turnOwner.getName() : null);
         state.put("currentTurnPlayerId", turnOwner != null ? turnOwner.getId() : null);
@@ -132,12 +170,18 @@ public class GameController {
             state.put("myFood", myPlayer.getResource(ResourceType.FOOD));
             state.put("myTroops", myPlayer.getTotalTroops());
             state.put("myCells", myPlayer.getCapturedCells().size());
+
+            PlayerEntity dbPlayer = statisticsService.getPlayerById(myPlayer.getId());
+            state.put("myTotalWins", dbPlayer != null ? dbPlayer.getTotalWins() : 0);
+            state.put("myTotalGames", dbPlayer != null ? dbPlayer.getTotalGames() : 0);
         } else {
             state.put("myGold", 0);
             state.put("myWood", 0);
             state.put("myFood", 0);
             state.put("myTroops", 0);
             state.put("myCells", 0);
+            state.put("myTotalWins", 0);
+            state.put("myTotalGames", 0);
         }
 
         return state;
@@ -145,15 +189,11 @@ public class GameController {
 
     @GetMapping("/leaderboard")
     public List<Map<String, Object>> getLeaderboard() {
-        System.out.println("=== GET /api/game/leaderboard ===");
-
+        List<PlayerEntity> topPlayers = statisticsService.getLeaderboard();
         List<Map<String, Object>> leaderboard = new ArrayList<>();
 
-        List<Player> sortedPlayers = new ArrayList<>(gameWorld.getPlayers().values());
-        sortedPlayers.sort((p1, p2) -> Integer.compare(p2.getTotalWins(), p1.getTotalWins()));
-
-        for (int i = 0; i < Math.min(10, sortedPlayers.size()); i++) {
-            Player player = sortedPlayers.get(i);
+        for (int i = 0; i < topPlayers.size(); i++) {
+            PlayerEntity player = topPlayers.get(i);
             Map<String, Object> entry = new HashMap<>();
             entry.put("name", player.getName());
             entry.put("totalWins", player.getTotalWins());
@@ -175,8 +215,9 @@ public class GameController {
     }
 
     @PostMapping("/turn/start")
-    public Map<String, Object> startTurn() {
-        System.out.println("=== POST /api/game/turn/start ===");
+    public Map<String, Object> startTurn(HttpServletRequest request) {
+        String userId = getCurrentUserId(request);
+        String currentPlayerId = getCurrentPlayerId(userId);
 
         Map<String, Object> response = new HashMap<>();
 
@@ -198,8 +239,6 @@ public class GameController {
             response.put("message", "Нет текущего игрока");
             return response;
         }
-
-        System.out.println("Comparing IDs - TurnOwner: " + turnOwner.getId() + ", Current: " + currentPlayerId);
 
         if (!turnOwner.getId().equals(currentPlayerId)) {
             response.put("success", false);
@@ -226,6 +265,7 @@ public class GameController {
                 response.put("troops", current.getTotalTroops());
                 response.put("cells", current.getCapturedCells().size());
             }
+            gamePersistenceService.autoSave(userId);
         } else {
             response.put("message", "Не удалось начать ход");
         }
@@ -234,8 +274,9 @@ public class GameController {
     }
 
     @PostMapping("/turn/end")
-    public Map<String, Object> endTurn() {
-        System.out.println("=== POST /api/game/turn/end ===");
+    public Map<String, Object> endTurn(HttpServletRequest request) {
+        String userId = getCurrentUserId(request);
+        String currentPlayerId = getCurrentPlayerId(userId);
 
         Map<String, Object> response = new HashMap<>();
 
@@ -264,6 +305,7 @@ public class GameController {
             response.put("message", "Ход завершен!");
             Player nextPlayer = turnService.getCurrentPlayer();
             response.put("nextPlayer", nextPlayer != null ? nextPlayer.getName() : null);
+            gamePersistenceService.autoSave(userId);
         } else {
             response.put("message", "Не удалось завершить ход");
         }
@@ -272,9 +314,9 @@ public class GameController {
     }
 
     @PostMapping("/attack")
-    public Map<String, Object> attack(@RequestBody AttackRequest request) {
-        System.out.println("=== POST /api/game/attack ===");
-        System.out.println("Attack target: [" + request.x + "," + request.y + "]");
+    public Map<String, Object> attack(@RequestBody AttackRequest request, HttpServletRequest httpRequest) {
+        String userId = getCurrentUserId(httpRequest);
+        String currentPlayerId = getCurrentPlayerId(userId);
 
         Map<String, Object> response = new HashMap<>();
 
@@ -328,9 +370,6 @@ public class GameController {
         List<Cell> playerCells = new ArrayList<>(myPlayer.getCapturedCells());
         playerCells.removeIf(Cell::isWater);
 
-        System.out.println("Player cells count: " + playerCells.size());
-        System.out.println("Player troops: " + myPlayer.getTotalTroops());
-
         if (playerCells.isEmpty()) {
             response.put("status", "error");
             response.put("message", "У вас нет клеток для атаки");
@@ -354,7 +393,7 @@ public class GameController {
         try {
             gameWorld.executeInstantAttack(playerCells, targetCell, currentPlayerId);
             turnService.registerCapture();
-            gamePersistenceService.autoSave();
+            gamePersistenceService.autoSave(userId);
 
             myPlayer = gameWorld.getPlayer(currentPlayerId);
 
@@ -373,9 +412,9 @@ public class GameController {
     }
 
     @PostMapping("/build")
-    public Map<String, Object> build(@RequestBody BuildRequest request) {
-        System.out.println("=== POST /api/game/build ===");
-        System.out.println("Build on cell: [" + request.x + "," + request.y + "] type: " + request.buildingType);
+    public Map<String, Object> build(@RequestBody BuildRequest request, HttpServletRequest httpRequest) {
+        String userId = getCurrentUserId(httpRequest);
+        String currentPlayerId = getCurrentPlayerId(userId);
 
         Map<String, Object> response = new HashMap<>();
 
@@ -441,7 +480,8 @@ public class GameController {
         myPlayer.spendResource(ResourceType.GOLD, costGold);
         myPlayer.spendResource(ResourceType.WOOD, costWood);
         cell.setBuilding(buildingType);
-        gamePersistenceService.autoSave();
+
+        gamePersistenceService.autoSave(userId);
 
         response.put("success", true);
         response.put("message", "Построено: " + buildingType.getDisplayName() + "!");
@@ -487,34 +527,37 @@ public class GameController {
     }
 
     @GetMapping("/debug")
-    public Map<String, Object> debug() {
+    public Map<String, Object> debug(HttpServletRequest request) {
+        String userId = getCurrentUserId(request);
+        String currentPlayerId = getCurrentPlayerId(userId);
+
         Map<String, Object> debug = new HashMap<>();
+        debug.put("currentUserId", userId);
         debug.put("currentPlayerId", currentPlayerId);
         debug.put("turnServiceState", turnService.getState().toString());
         debug.put("isGameFinished", turnService.isGameFinished());
         debug.put("winner", turnService.getWinner() != null ? turnService.getWinner().getName() : null);
         debug.put("currentPlayer", turnService.getCurrentPlayer() != null ?
                 turnService.getCurrentPlayer().getName() : null);
-        debug.put("currentPlayerIdFromTurn", turnService.getCurrentPlayer() != null ?
-                turnService.getCurrentPlayer().getId() : null);
         debug.put("canAttack", currentPlayerId != null && turnService.canAttack(currentPlayerId));
         debug.put("hasCapturedThisTurn", turnService.hasCapturedThisTurn());
         debug.put("playersCount", gameWorld.getPlayers().size());
         debug.put("cellsCount", gameWorld.getCells().size());
-        debug.put("myPlayerExists", currentPlayerId != null && gameWorld.getPlayer(currentPlayerId) != null);
+        debug.put("hasSavedGame", gamePersistenceService.hasSavedGame(userId));
         return debug;
     }
 
     @PostMapping("/reset")
-    public Map<String, Object> resetGame() {
-        System.out.println("=== POST /api/game/reset ===");
+    public Map<String, Object> resetGame(HttpServletRequest request) {
+        String userId = getCurrentUserId(request);
 
         gameWorld.reset();
         gameWorld.createWorld(10, 10);
-
-        this.currentPlayerId = null;
-
+        userCurrentPlayerIds.remove(userId);
+        userStatisticsUpdated.remove(userId);
         turnService.reset();
+
+        gamePersistenceService.clearSave(userId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -522,13 +565,52 @@ public class GameController {
         return response;
     }
 
-    public void setCurrentPlayerId(String playerId) {
-        this.currentPlayerId = playerId;
-        System.out.println("Current player ID set to: " + playerId);
+    private void updateWinnerStatistics(Player winner) {
+        try {
+            PlayerEntity playerEntity = statisticsService.getOrCreatePlayer(winner.getId(), winner.getName());
+            int cellsCaptured = winner.getCapturedCells().size();
+
+            statisticsService.updatePlayerStats(playerEntity, cellsCaptured, calculateGameScore(cellsCaptured, true), true);
+
+            String gameId = UUID.randomUUID().toString();
+            statisticsService.addGameHistory(gameId, playerEntity, true, cellsCaptured, turnService.getTurnNumber());
+
+            System.out.println("✅ ПОБЕДА! Статистика обновлена для: " + winner.getName());
+            System.out.println("   - Всего побед: " + playerEntity.getTotalWins());
+            System.out.println("   - Всего игр: " + playerEntity.getTotalGames());
+        } catch (Exception e) {
+            System.err.println("❌ Ошибка при обновлении статистики победителя: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
-    public String getCurrentPlayerId() {
-        return currentPlayerId;
+    private void updateLoserStatistics(Player loser) {
+        try {
+            PlayerEntity playerEntity = statisticsService.getOrCreatePlayer(loser.getId(), loser.getName());
+            int cellsCaptured = loser.getCapturedCells().size();
+
+            statisticsService.updatePlayerStats(playerEntity, cellsCaptured, calculateGameScore(cellsCaptured, false), false);
+
+            String gameId = UUID.randomUUID().toString();
+            statisticsService.addGameHistory(gameId, playerEntity, false, cellsCaptured, turnService.getTurnNumber());
+
+            System.out.println("📊 Статистика обновлена для проигравшего: " + loser.getName());
+        } catch (Exception e) {
+            System.err.println("❌ Ошибка при обновлении статистики проигравшего: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private int calculateGameScore(int cellsCaptured, boolean isWinner) {
+        int score = cellsCaptured * 10;
+        if (isWinner) score += 100;
+        return score;
+    }
+
+    public void setCurrentPlayerId(String userId, String playerId) {
+        userCurrentPlayerIds.put(userId, playerId);
+        userStatisticsUpdated.put(userId, false);
+        System.out.println("🎮 Пользователь " + userId + " теперь играет за " + playerId);
     }
 
     static class AttackRequest {

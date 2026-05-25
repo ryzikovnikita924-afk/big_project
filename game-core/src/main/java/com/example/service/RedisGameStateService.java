@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class RedisGameStateService {
 
-    private static final String CURRENT_GAME_KEY = "current_game_state";
+    private static final String GAME_STATE_PREFIX = "game:state:user:";
     private static final long TTL_HOURS = 24;
 
     private final RedisTemplate<String, Object> redisTemplate;
@@ -18,24 +18,58 @@ public class RedisGameStateService {
     public RedisGameStateService(RedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        System.out.println("🔴 RedisGameStateService инициализирован");
+        testConnection();
     }
 
-    public void saveCurrentGame(GameStateSnapshot snapshot) {
+    private String getKey(String userId) {
+        return GAME_STATE_PREFIX + userId;
+    }
+
+    public void saveCurrentGame(String userId, GameStateSnapshot snapshot) {
+        System.out.println("\n🔴 СОХРАНЕНИЕ В REDIS для пользователя: " + userId);
+        String key = getKey(userId);
+        System.out.println("🔴 Ключ: " + key);
+
+        if (snapshot == null) {
+            System.err.println("❌ Snapshot is NULL");
+            return;
+        }
+
         try {
+            System.out.println("🔴 Game ID: " + snapshot.getGameId());
+            System.out.println("🔴 Turn: " + snapshot.getTurnNumber());
+
             snapshot.setTimestamp(System.currentTimeMillis());
-            redisTemplate.opsForValue().set(CURRENT_GAME_KEY, snapshot, TTL_HOURS, TimeUnit.HOURS);
-            System.out.println("✅ Текущее состояние игры сохранено в Redis");
+
+            redisTemplate.opsForValue().set(key, snapshot, TTL_HOURS, TimeUnit.HOURS);
+            System.out.println("✅ REDIS: данные сохранены для пользователя " + userId);
         } catch (Exception e) {
             System.err.println("❌ Ошибка сохранения: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    public GameStateSnapshot loadCurrentGame() {
+    public GameStateSnapshot loadCurrentGame(String userId) {
+        System.out.println("\n🔴 ЗАГРУЗКА ИЗ REDIS для пользователя: " + userId);
+        String key = getKey(userId);
+        System.out.println("🔴 Ключ: " + key);
+
         try {
-            Object snapshot = redisTemplate.opsForValue().get(CURRENT_GAME_KEY);
+            Boolean hasKey = redisTemplate.hasKey(key);
+            if (!Boolean.TRUE.equals(hasKey)) {
+                System.out.println("🔴 Ключ не найден для пользователя " + userId);
+                return null;
+            }
+
+            Object snapshot = redisTemplate.opsForValue().get(key);
+
             if (snapshot instanceof GameStateSnapshot) {
-                System.out.println("✅ Состояние игры загружено из Redis");
-                return (GameStateSnapshot) snapshot;
+                GameStateSnapshot loaded = (GameStateSnapshot) snapshot;
+                System.out.println("✅ REDIS: данные загружены для пользователя " + userId);
+                System.out.println("   - Game ID: " + loaded.getGameId());
+                System.out.println("   - Turn: " + loaded.getTurnNumber());
+                return loaded;
             }
             return null;
         } catch (Exception e) {
@@ -44,12 +78,46 @@ public class RedisGameStateService {
         }
     }
 
-    public boolean hasCurrentGame() {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(CURRENT_GAME_KEY));
+    public boolean hasCurrentGame(String userId) {
+        try {
+            String key = getKey(userId);
+            Boolean hasKey = redisTemplate.hasKey(key);
+            boolean exists = Boolean.TRUE.equals(hasKey);
+            System.out.println("🔴 Проверка для " + userId + ": " + exists);
+            return exists;
+        } catch (Exception e) {
+            System.err.println("❌ Ошибка проверки: " + e.getMessage());
+            return false;
+        }
     }
 
-    public void deleteCurrentGame() {
-        redisTemplate.delete(CURRENT_GAME_KEY);
-        System.out.println("🗑️ Состояние игры удалено из Redis");
+    public void deleteCurrentGame(String userId) {
+        try {
+            String key = getKey(userId);
+            redisTemplate.delete(key);
+            System.out.println("🗑️ Ключ удален для пользователя: " + userId);
+        } catch (Exception e) {
+            System.err.println("❌ Ошибка удаления: " + e.getMessage());
+        }
+    }
+
+    private void testConnection() {
+        try {
+            String testKey = "test:connection:" + System.currentTimeMillis();
+            String testValue = "test_value";
+
+            redisTemplate.opsForValue().set(testKey, testValue, 10, TimeUnit.SECONDS);
+            String retrieved = (String) redisTemplate.opsForValue().get(testKey);
+            redisTemplate.delete(testKey);
+
+            if (testValue.equals(retrieved)) {
+                System.out.println("✅ Redis подключен и работает");
+            } else {
+                System.err.println("❌ Redis НЕ РАБОТАЕТ");
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Нет подключения к Redis: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }

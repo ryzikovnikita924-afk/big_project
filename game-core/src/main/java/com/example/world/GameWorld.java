@@ -105,29 +105,12 @@ public class GameWorld {
         return neighbors;
     }
 
-    public boolean startTurn(String playerId) {
-        return turnService != null && turnService.startTurn(playerId);
-    }
-
-    public boolean endTurn(String playerId) {
-        return turnService != null && turnService.endTurn(playerId);
-    }
-
-    public boolean isMyTurn(String playerId) {
-        return turnService != null && turnService.isMyTurn(playerId);
-    }
 
     public boolean canAttack(String playerId) {
         return turnService != null && turnService.canAttack(playerId);
     }
 
-    public Player getCurrentPlayer() {
-        return turnService != null ? turnService.getCurrentPlayer() : null;
-    }
 
-    public int getCurrentTurn() {
-        return turnService != null ? turnService.getTurnNumber() : 0;
-    }
 
     public Player getWinner() {
         return turnService != null ? turnService.getWinner() : null;
@@ -209,16 +192,16 @@ public class GameWorld {
         boolean isNeutral = attackCell.getOwnerId() == null;
         int conquestCost = attackCell.getConquestCost();
 
-        // Для нейтральных клеток стоимость 0 - не тратим войска
+
         if (!isNeutral && attacker.getTotalTroops() < conquestCost) {
             throw new IllegalStateException("Недостаточно войск для атаки! Нужно " + conquestCost + ", есть " + attacker.getTotalTroops());
         }
 
-        // Захватываем клетку
+
         String oldOwnerId = attackCell.getOwnerId();
         attackCell.setOwnerId(playerId);
 
-        // Тратим войска только для вражеских клеток
+
         if (!isNeutral) {
             attacker.removeTroops(conquestCost);
             System.out.println("Потрачено войск: " + conquestCost);

@@ -2,184 +2,252 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoStrat - Клеточная стратегия</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>GeoStrat · Тактическая стратегия</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css"/>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css"/>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="/js/auth.js"></script>
-    <script src="/js/game.js"></script>
     <style>
+        * { user-select: none; }
+
+        body {
+            background: radial-gradient(ellipse at 20% 30%, #0a0f1e, #03060c);
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb { background: #f97316; border-radius: 8px; }
+
+        #map {
+            display: grid;
+            grid-template-columns: repeat(10, 72px);
+            background: #0b1120;
+            padding: 16px;
+            border-radius: 32px;
+            gap: 6px;
+            box-shadow: 0 25px 40px -12px rgba(0,0,0,0.5);
+        }
+
         .cell {
-            width: 70px;
-            height: 70px;
-            border: 1px solid #334155;
+            width: 72px;
+            height: 72px;
+            border-radius: 14px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.2s;
-            font-size: 10px;
-            border-radius: 4px;
+            transition: all 0.2s ease;
             position: relative;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,240,0.1);
         }
-        .cell:hover { transform: scale(0.95); filter: brightness(1.1); }
-        .cell.selected { border: 3px solid #fbbf24; box-shadow: 0 0 10px #fbbf24; }
-        .cell.can-attack { cursor: pointer; opacity: 1; }
-        .cell.cannot-attack { cursor: not-allowed; opacity: 0.5; }
-        .cell.can-build { cursor: pointer; border: 2px dashed #10b981; background: rgba(16,185,129,0.2); }
-        .player1 { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
-        .player2 { background: linear-gradient(135deg, #1e3a5f, #2563eb); }
-        .neutral { background: linear-gradient(135deg, #334155, #475569); }
-        .water { background: linear-gradient(135deg, #0c4a6e, #0284c7); }
-        #map {
-            display: grid;
-            grid-template-columns: repeat(10, 70px);
-            background: #0f172a;
-            padding: 15px;
-            border-radius: 10px;
+        .cell:hover { transform: translateY(-3px); filter: brightness(1.1); }
+        .cell.selected {
+            border: 3px solid #fbbf24;
+            box-shadow: 0 0 0 2px #f59e0b, 0 8px 18px -2px #f97316;
+            transform: scale(0.97);
         }
-        .terrain-icon { font-size: 28px; }
+        .cell.can-attack {
+            animation: pulse-attack 1.2s infinite;
+            cursor: pointer;
+        }
+        @keyframes pulse-attack {
+            0% { box-shadow: 0 0 0 1px #ff8c42, inset 0 0 8px rgba(255,100,0,0.3);}
+            100% { box-shadow: 0 0 0 3px #ffb347, inset 0 0 14px rgba(255,140,0,0.6);}
+        }
+        .cell.can-build {
+            border: 2px dashed #2dd4bf;
+            background: radial-gradient(circle at 30% 20%, rgba(45,212,191,0.25), rgba(20,150,130,0.1));
+        }
+
+        .terrain-icon { font-size: 28px; text-shadow: 0 2px 3px black; }
+        .terrain-label {
+            font-size: 8px; font-weight: bold; background: rgba(0,0,0,0.7);
+            padding: 2px 6px; border-radius: 20px; margin-top: 3px;
+        }
+
         .building-icon {
-            position: absolute;
-            bottom: 2px;
-            right: 2px;
-            font-size: 14px;
-            background: rgba(0,0,0,0.6);
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
+            position: absolute; bottom: 4px; right: 4px;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);
+            border-radius: 30px; width: 24px; height: 24px; font-size: 13px;
+            display: flex; align-items: center; justify-content: center;
+            border: 1px solid #fbbf24aa;
+        }
+
+        .player1 { background: linear-gradient(145deg, #c0392b, #922b21); border-bottom: 3px solid #ffb347; }
+        .player2 { background: linear-gradient(145deg, #e67e22, #b8590a); border-bottom: 3px solid #ffd966; }
+        .neutral { background: linear-gradient(145deg, #4a5568, #2d3748); border-bottom: 2px solid #a0aec0; }
+        .water { background: linear-gradient(135deg, #0f5b6e, #064e5c); border-bottom: 2px solid #2dd4bf; }
+
+        .glass-card {
+            background: rgba(12, 20, 35, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            border-radius: 28px;
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover { border-color: rgba(251, 191, 36, 0.4); }
+
+        .resources-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+        .resource-pill {
+            background: rgba(10, 15, 28, 0.9);
+            border-radius: 48px;
+            padding: 8px 12px;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
+            font-weight: 600;
+            font-size: 0.85rem;
+            border: 1px solid rgba(251, 191, 36, 0.3);
+        }
+        .resource-value {
+            font-weight: 800;
+            color: #fbbf24;
+            background: #00000060;
+            padding: 2px 10px;
+            border-radius: 24px;
+            min-width: 45px;
+            text-align: center;
+        }
+
+        .btn-game {
+            background: linear-gradient(95deg, #fbbf24, #f97316);
+            border: none;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+        .btn-game:hover { transform: scale(0.97); box-shadow: 0 5px 18px rgba(249,115,22,0.5); }
+        .btn-outline-game {
+            background: transparent;
+            border: 1px solid rgba(251, 191, 36, 0.5);
+            color: #fbbf24;
+        }
+        .btn-outline-game:hover { background: rgba(251, 191, 36, 0.2); transform: scale(0.97); }
+
+        .badge-glow {
+            background: rgba(251, 191, 36, 0.15);
+            border: 1px solid #fbbf24;
+            color: #ffdd99;
         }
 
         .loader {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); backdrop-filter: blur(12px);
+            display: flex; justify-content: center; align-items: center; z-index: 2000;
         }
         .loader-spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+            width: 56px; height: 56px; border: 4px solid #f97316;
+            border-top: 4px solid #ffdd99; border-radius: 50%;
+            animation: spin 0.9s linear infinite;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         .btn-active {
-            background-color: #10b981;
-            color: white;
+            background: #2dd4bf !important;
+            color: #0a0f1e !important;
+            box-shadow: 0 0 15px #2dd4bf;
         }
+
+        .hover-scale:hover { transform: scale(1.02); }
+        .transition-fast { transition: all 0.15s ease; }
     </style>
+    <script src="/js/auth.js"></script>
 </head>
-<body class="min-h-screen bg-base-200">
+<body class="min-h-screen text-white">
+
 <div id="loader" class="loader" style="display: none;">
     <div class="loader-spinner"></div>
 </div>
 
 <div id="main-content" style="display: none;">
-    <div class="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-6">
-        <header class="hero rounded-box bg-base-100 shadow-sm">
-            <div class="hero-content w-full flex-col items-start gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                    <p class="text-sm uppercase tracking-[0.3em] text-primary">GeoStrat</p>
-                    <h1 class="text-4xl font-black">Клеточная стратегия</h1>
-                    <p class="max-w-2xl text-base-content/70">
-                        Пошаговая стратегия | PvP | Экономика
-                    </p>
-                </div>
-                <div class="flex flex-col items-start gap-3 sm:items-end">
-                    <div id="auth-state" class="badge badge-neutral badge-lg">Проверяем сессию...</div>
-                    <div class="flex gap-3">
-                        <button id="login-link" class="btn btn-primary btn-sm hidden">🔐 Войти</button>
-                        <button id="new-game-btn" class="btn btn-primary btn-sm">🎮 Новая игра</button>
-                        <button id="logout-button" class="btn btn-neutral btn-sm" type="button">🚪 Выйти</button>
-                    </div>
+    <div class="mx-auto max-w-7xl px-4 py-5">
+        <header class="glass-card mb-6 flex flex-col md:flex-row justify-between items-center p-5 gap-4">
+            <div class="text-center md:text-left">
+                <p class="text-xs font-bold tracking-[0.3em] text-orange-400 uppercase">turn-based · pvp</p>
+                <h1 class="text-4xl md:text-5xl font-black bg-gradient-to-r from-amber-300 to-orange-500 bg-clip-text text-transparent">GeoStrat</h1>
+                <p class="text-sm text-white/50">Тактика, ресурсы, завоевания</p>
+            </div>
+            <div class="flex flex-col items-end gap-3">
+                <div id="auth-state" class="badge badge-ghost badge-lg text-white/80 border-white/20 px-4 py-2">Авторизация...</div>
+                <div class="flex gap-3">
+                    <button id="new-game-btn" class="btn btn-sm bg-amber-600 hover:bg-amber-500 border-none text-white font-bold shadow-md px-5">🎲 Новая игра</button>
+                    <button id="logout-button" class="btn btn-sm btn-outline border-white/20 text-white hover:bg-white/10 px-5">🚪 Выйти</button>
                 </div>
             </div>
         </header>
 
         <div id="game-container" style="display: none;">
-            <div class="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-                <div class="card bg-base-100 shadow-sm">
-                    <div class="card-body">
-                        <h2 class="card-title">Игровая карта</h2>
-                        <div id="map" class="flex justify-center"></div>
+            <div class="grid gap-6 lg:grid-cols-[1fr_0.85fr]">
+                <div class="glass-card p-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-bold flex items-center gap-2">🗺️ Поле боя</h2>
+                        <div class="badge badge-glow px-3 py-2">10x10 секторов</div>
                     </div>
+                    <div id="map" class="flex justify-center overflow-x-auto pb-1"></div>
                 </div>
 
-                <div class="space-y-4">
-                    <div class="card bg-base-100 shadow-sm">
-                        <div class="card-body">
-                            <h2 class="card-title">🎮 Управление ходом</h2>
-                            <div class="flex justify-between">
-                                <span>📊 Ход: <span id="turn-number">1</span></span>
-                                <span>👑 Игрок: <span id="current-player">-</span></span>
-                            </div>
-                            <div id="turn-status" class="text-center font-bold">⏳ Загрузка...</div>
-                            <div id="turn-alert" class="mt-2"></div>
-                            <div class="flex gap-2">
-                                <button id="start-turn-btn" class="btn btn-primary flex-1 hidden">🎯 Начать ход</button>
-                                <button id="end-turn-btn" class="btn btn-secondary flex-1 hidden">✅ Завершить ход</button>
-                            </div>
-                            <div class="flex gap-2 mt-2">
-                                <button id="build-mode-btn" class="btn btn-outline btn-sm w-full">🏗️ Режим строительства</button>
-                            </div>
+                <div class="space-y-5">
+                    <div class="glass-card p-5">
+                        <h2 class="text-xl font-bold flex items-center gap-2 mb-3">⚙️ Управление</h2>
+                        <div class="flex justify-between items-center gap-3">
+                            <div class="resource-pill flex-1"><span>📆 Ход</span> <span id="turn-number" class="resource-value">0</span></div>
+                            <div class="resource-pill flex-1"><span>👑 Игрок</span> <span id="current-player" class="resource-value">—</span></div>
+                        </div>
+                        <div id="turn-status" class="text-center my-4 font-bold text-base bg-black/30 rounded-xl py-2 text-orange-200">⏳ Загрузка сессии...</div>
+                        <div id="turn-alert" class="mb-3"></div>
+                        <div class="flex gap-3">
+                            <button id="start-turn-btn" class="btn btn-game flex-1 hidden text-white">🎯 Начать ход</button>
+                            <button id="end-turn-btn" class="btn btn-game flex-1 hidden text-white">✅ Завершить ход</button>
+                        </div>
+                        <button id="build-mode-btn" class="btn btn-outline-game btn-sm w-full mt-3">🏗️ Режим строительства</button>
+                    </div>
+
+                    <div class="glass-card p-5">
+                        <h2 class="text-lg font-bold flex items-center gap-2 mb-3">💰 Казна & Армия</h2>
+                        <div class="resources-grid">
+                            <div class="resource-pill"><span>🪙 Золото</span> <span id="gold" class="resource-value">0</span></div>
+                            <div class="resource-pill"><span>🌲 Древесина</span> <span id="wood" class="resource-value">0</span></div>
+                            <div class="resource-pill"><span>🍗 Еда</span> <span id="food" class="resource-value">0</span></div>
+                            <div class="resource-pill"><span>⚔️ Войска</span> <span id="total-troops" class="resource-value">0</span></div>
+                            <div class="resource-pill"><span>🏰 Владения</span> <span id="my-cells" class="resource-value">0</span></div>
                         </div>
                     </div>
 
-                    <div class="card bg-base-100 shadow-sm">
-                        <div class="card-body">
-                            <h2 class="card-title">💰 Мои ресурсы</h2>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>🪙 Золото: <span id="gold">0</span></div>
-                                <div>🌲 Дерево: <span id="wood">0</span></div>
-                                <div>🍖 Еда: <span id="food">0</span></div>
-                                <div>⚔️ Войска: <span id="total-troops">0</span></div>
-                                <div>🏰 Клеток: <span id="my-cells">0</span></div>
-                            </div>
-                        </div>
+                    <div id="build-panel" class="glass-card p-5 hidden">
+                        <h2 class="text-xl font-bold flex items-center gap-2 mb-3">🏛️ Возведение</h2>
+                        <div id="build-alert" class="mb-2"></div>
+                        <div id="available-buildings" class="space-y-2"></div>
                     </div>
 
-                    <div id="build-panel" class="card bg-base-100 shadow-sm hidden">
-                        <div class="card-body">
-                            <h2 class="card-title">🏗️ Строительство</h2>
-                            <div id="build-alert" class="mb-2"></div>
-                            <div id="available-buildings" class="space-y-2"></div>
-                        </div>
+                    <div class="glass-card p-5">
+                        <h2 class="text-lg font-bold mb-3">🏆 Рейтинг стратегов</h2>
+                        <div id="leaderboard-list" class="space-y-2 text-sm max-h-36 overflow-y-auto"></div>
                     </div>
 
-                    <div class="card bg-base-100 shadow-sm">
-                        <div class="card-body">
-                            <h2 class="card-title">🏆 Таблица лидеров</h2>
-                            <div id="leaderboard-list" class="space-y-1 text-sm"></div>
-                        </div>
-                    </div>
-
-                    <div class="card bg-base-100 shadow-sm">
-                        <div class="card-body">
-                            <h2 class="card-title">📜 Лог боя</h2>
-                            <div id="battle-log" class="h-32 overflow-y-auto space-y-1 text-xs"></div>
-                        </div>
+                    <div class="glass-card p-5">
+                        <h2 class="text-lg font-bold mb-3">📜 Летопись сражений</h2>
+                        <div id="battle-log" class="h-32 overflow-y-auto space-y-1 text-xs font-mono bg-black/30 rounded-xl p-2"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    window.showAlert = function(elementId, type, message) {
+        const alertDiv = document.getElementById(elementId);
+        if (!alertDiv) return;
+        alertDiv.innerHTML = `<div class="alert ${type} shadow-lg text-sm rounded-xl"><span>${message}</span></div>`;
+        setTimeout(() => { if (alertDiv.firstChild) alertDiv.removeChild(alertDiv.firstChild); }, 5000);
+    };
+</script>
 
 <script>
     (async function() {
@@ -202,74 +270,328 @@
         loader.style.display = "none";
         mainContent.style.display = "block";
 
-        authStateBadge.className = "badge badge-success badge-lg";
-        authStateBadge.textContent = `Вы вошли как ${AuthApi.extractDisplayName(body.userInfo)}`;
+        const displayName = AuthApi.extractDisplayName(body.userInfo);
+        const userId = body.userInfo?.preferred_username || body.userInfo?.email || body.userInfo?.user;
 
-        // Создаем экземпляр игры
+        authStateBadge.className = "badge badge-success badge-lg gap-1 px-4 py-2";
+        authStateBadge.textContent = `✨ ${displayName}`;
+
+        window.currentUserId = userId;
+
         const game = new GeoStratGame();
+        game.myUserId = userId;
+        game.myPlayerName = displayName;
 
-        // Получаем информацию о пользователе
         try {
             const userResponse = await fetch('/api/user/me', { credentials: 'include' });
             if (userResponse.ok) {
                 const userData = await userResponse.json();
                 if (userData.authenticated) {
                     game.myPlayerId = userData.id;
-                    game.myPlayerName = userData.username || userData.name || AuthApi.extractDisplayName(body.userInfo);
-                    console.log("Player ID:", game.myPlayerId, "Name:", game.myPlayerName);
                 }
             }
         } catch (error) {
-            console.error("Failed to get user details:", error);
-            game.myPlayerId = body.userInfo?.user || body.userInfo?.email;
-            game.myPlayerName = AuthApi.extractDisplayName(body.userInfo);
+            game.myPlayerId = userId;
         }
 
-        // Функция для загрузки игры
         async function loadGame() {
             loader.style.display = 'flex';
             try {
                 await game.loadMap();
                 await game.checkGameState();
 
-                // Проверяем, есть ли активная игра
                 if (game.gameState && game.gameState.currentTurnPlayer) {
                     game.gameActive = true;
                     game.setupEventListeners();
                     gameContainer.style.display = 'block';
                     await game.loadBuildings();
-                    console.log("Game loaded successfully");
                 } else {
                     gameContainer.style.display = 'none';
-                    document.getElementById('turn-status').innerHTML = '🎮 Нет активной игры. Нажмите "Новая игра"';
+                    document.getElementById('turn-status').innerHTML = '⚔️ Нет активной партии. Нажмите "Новая игра"';
                 }
             } catch (error) {
-                console.error("Error loading game:", error);
+                console.error(error);
                 gameContainer.style.display = 'none';
-                document.getElementById('turn-status').innerHTML = '🎮 Нет активной игры. Нажмите "Новая игра"';
+                document.getElementById('turn-status').innerHTML = '🌀 Ожидание создания игры';
             }
             loader.style.display = 'none';
         }
 
-        // Загружаем игру
         await loadGame();
 
-        // Обработчик кнопки новой игры
         newGameBtn.onclick = () => {
-            window.location.href = "/choose-opponent.html";
+            window.location.href = `/choose-opponent.html?userId=${encodeURIComponent(userId)}`;
         };
 
-        // Обработчик выхода
         logoutButton.onclick = () => AuthApi.logout();
 
-        // Периодическое обновление
         setInterval(() => {
             if (game.gameActive) {
                 game.checkGameState();
                 game.loadLeaderboard();
             }
-        }, 3000);
+        }, 3200);
     })();
+</script>
+
+<script>
+    class GeoStratGame {
+        constructor() {
+            this.myPlayerId = null;
+            this.myPlayerName = null;
+            this.myUserId = null;
+            this.gameActive = false;
+            this.selectedCell = null;
+            this.mapData = null;
+            this.buildingsData = null;
+            this.buildMode = false;
+            this.gameState = { canStartTurn: false, canAttack: false, canEndTurn: false, hasCapturedThisTurn: false, gameState: 'WAITING', currentTurnPlayer: null, turn: 1 };
+            this.GameApi = this.initGameApi();
+        }
+
+        initGameApi() {
+            return {
+                request: async (endpoint, options = {}) => {
+                    const headers = { 'Content-Type': 'application/json', ...options.headers };
+                    if (this.myUserId) {
+                        headers['X-User-Id'] = this.myUserId;
+                    }
+                    const response = await fetch(`/api/game${endpoint}`, { ...options, credentials: 'include', headers });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return await response.json();
+                },
+                startVsAI: (playerId, playerName, difficulty) => this.GameApi.request('/start-vs-ai', {
+                    method: 'POST',
+                    body: JSON.stringify({ playerId, playerName, difficulty, userId: this.myUserId })
+                }),
+                reset: () => this.GameApi.request('/reset', { method: 'POST' }),
+                getMap: () => this.GameApi.request('/map'),
+                getGameState: () => this.GameApi.request('/state'),
+                startTurn: () => this.GameApi.request('/turn/start', { method: 'POST' }),
+                endTurn: () => this.GameApi.request('/turn/end', { method: 'POST' }),
+                attack: (x, y) => this.GameApi.request('/attack', { method: 'POST', body: JSON.stringify({ x, y, troops: 1 }) }),
+                build: (x, y, buildingType) => this.GameApi.request('/build', { method: 'POST', body: JSON.stringify({ x, y, buildingType }) }),
+                getLeaderboard: () => this.GameApi.request('/leaderboard'),
+                getBuildings: () => this.GameApi.request('/buildings')
+            };
+        }
+
+        async loadMap() { try { const data = await this.GameApi.getMap(); if (data) { this.mapData = data; this.renderMap(); } } catch(e) { console.error(e); } }
+        async loadBuildings() { try { const data = await this.GameApi.getBuildings(); if (data && Array.isArray(data)) { this.buildingsData = data; this.renderBuildPanel(); } } catch(e) { console.error(e); } }
+
+        getBuildingIcon(type) { const map = { 'BARRACKS': '⚔️', 'PORT': '⚓', 'SAWMILL': '🪚', 'FARM': '🌾' }; return map[type] || '🏛️'; }
+        getBuildingName(type) { const names = { 'BARRACKS': 'Казармы', 'PORT': 'Порт', 'SAWMILL': 'Лесопилка', 'FARM': 'Ферма' }; return names[type] || type; }
+        canBuildOnTerrain(buildingType, terrain) { const allowed = { 'BARRACKS': 'PLAIN', 'PORT': 'WATER', 'SAWMILL': 'FOREST', 'FARM': 'PLAIN' }; return allowed[buildingType] === terrain; }
+
+        renderBuildPanel() {
+            const panel = document.getElementById('available-buildings');
+            if (!panel) return;
+            if (!this.selectedCell) { panel.innerHTML = '<div class="text-center text-white/50 py-3">🔍 Выберите свою клетку</div>'; return; }
+            if (!this.buildingsData) { panel.innerHTML = '<div class="text-center">загрузка...</div>'; return; }
+            panel.innerHTML = '';
+            const cell = this.selectedCell;
+            for (const building of this.buildingsData) {
+                const canBuild = this.canBuildOnTerrain(building.type, cell.terrain);
+                const btn = document.createElement('button');
+                btn.className = `btn btn-sm w-full mb-2 ${canBuild ? 'btn-game text-white' : 'opacity-40 cursor-not-allowed bg-gray-600'}`;
+                btn.innerHTML = `${this.getBuildingIcon(building.type)} ${building.name}  🪙${building.costGold}  🌲${building.costWood}`;
+                if (canBuild) btn.onclick = () => this.buildOnSelectedCell(building.type);
+                else btn.disabled = true;
+                panel.appendChild(btn);
+            }
+        }
+
+        async buildOnSelectedCell(buildingType) {
+            if (!this.selectedCell) { window.showAlert('build-alert', 'alert-warning', 'Выберите клетку'); return; }
+            const body = await this.GameApi.build(this.selectedCell.x, this.selectedCell.y, buildingType);
+            if (body?.success) {
+                this.addBattleLog(`🏗️ Построено: ${body.buildingName} на [${this.selectedCell.x},${this.selectedCell.y}]`);
+                this.selectedCell = null; this.buildMode = false;
+                document.getElementById('build-panel')?.classList.add('hidden');
+                document.getElementById('build-mode-btn')?.classList.remove('btn-active');
+                await this.loadMap(); await this.checkGameState();
+            } else { window.showAlert('build-alert', 'alert-error', body?.message || 'Ошибка строительства'); }
+        }
+
+        toggleBuildMode() {
+            if (!this.gameState.canStartTurn && !this.gameState.canEndTurn) { window.showAlert('turn-alert', 'alert-warning', 'Сейчас не ваш ход!'); return; }
+            this.buildMode = !this.buildMode;
+            const btn = document.getElementById('build-mode-btn');
+            if (this.buildMode) { btn?.classList.add('btn-active'); window.showAlert('build-alert', 'alert-info', 'Режим стройки: нажмите на свою клетку'); }
+            else { btn?.classList.remove('btn-active'); this.selectedCell = null; document.getElementById('build-panel')?.classList.add('hidden'); window.showAlert('build-alert', 'alert-info', 'Строительство выключено'); }
+            this.renderMap();
+        }
+
+        getTerrainSymbol(terrain) {
+            switch(terrain) {
+                case 'FOREST': return '🌲';
+                case 'MOUNTAIN': return '⛰️';
+                case 'CITY': return '🏛️';
+                case 'WATER': return '💧';
+                case 'PLAIN': return '🌾';
+                default: return '🌾';
+            }
+        }
+        getTerrainLabel(terrain) {
+            switch(terrain) {
+                case 'FOREST': return 'лес';
+                case 'MOUNTAIN': return 'гора';
+                case 'CITY': return 'город';
+                case 'WATER': return 'вода';
+                case 'PLAIN': return 'равнина';
+                default: return 'равнина';
+            }
+        }
+
+        renderMap() {
+            const mapDiv = document.getElementById('map');
+            if (!this.mapData || !mapDiv) return;
+            mapDiv.innerHTML = '';
+            for (let y = 0; y < 10; y++) {
+                for (let x = 0; x < 10; x++) {
+                    const cell = this.mapData.cells?.find(c => c.x === x && c.y === y);
+                    if (!cell) continue;
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell';
+                    const canBuildHere = (cell.owner === this.myPlayerId) && !cell.building && !cell.isWater;
+                    if (this.buildMode && canBuildHere) cellDiv.classList.add('can-build');
+                    if (this.gameState.canAttack && !this.buildMode && cell.owner !== this.myPlayerId && !cell.isWater) cellDiv.classList.add('can-attack');
+
+                    if (cell.isWater) cellDiv.classList.add('water');
+                    else if (cell.owner === null) cellDiv.classList.add('neutral');
+                    else if (cell.owner === this.myPlayerId) cellDiv.classList.add('player1');
+                    else cellDiv.classList.add('player2');
+
+                    const terrainSym = this.getTerrainSymbol(cell.terrain);
+                    const terrainLabel = this.getTerrainLabel(cell.terrain);
+                    let buildingHtml = '';
+                    if (cell.building && cell.building !== 'NONE') {
+                        buildingHtml = `<div class="building-icon" title="${this.getBuildingName(cell.building)}">${this.getBuildingIcon(cell.building)}</div>`;
+                    }
+                    cellDiv.innerHTML = `<div class="terrain-icon">${terrainSym}</div><div class="terrain-label">${terrainLabel}</div>${buildingHtml}`;
+
+                    cellDiv.onclick = () => {
+                        if (this.buildMode && canBuildHere) this.selectCellForBuild(cell);
+                        else if (this.gameState.canAttack && !this.buildMode && cell.owner !== this.myPlayerId && !cell.isWater) this.handleCellClick(cell);
+                        else if (cell.owner === this.myPlayerId && !this.buildMode) window.showAlert('turn-alert', 'alert-info', '🏗️ Включите режим строительства');
+                        else if (!this.gameState.canAttack && cell.owner !== this.myPlayerId) window.showAlert('turn-alert', 'alert-warning', 'Сейчас нельзя атаковать');
+                    };
+                    if (this.selectedCell && this.selectedCell.x === x && this.selectedCell.y === y) cellDiv.classList.add('selected');
+                    mapDiv.appendChild(cellDiv);
+                }
+            }
+        }
+
+        selectCellForBuild(cell) { this.selectedCell = cell; this.renderMap(); this.renderBuildPanel(); document.getElementById('build-panel')?.classList.remove('hidden'); window.showAlert('build-alert', 'alert-info', `Выбрана клетка [${cell.x},${cell.y}]`); }
+
+        async handleCellClick(cell) {
+            if (!this.gameActive) return;
+            if (!this.gameState.canAttack) {
+                if (this.gameState.hasCapturedThisTurn) window.showAlert('turn-alert', 'alert-warning', 'Вы уже захватили клетку в этом ходу!');
+                else if (this.gameState.canStartTurn) window.showAlert('turn-alert', 'alert-warning', 'Начните ход сначала!');
+                else window.showAlert('turn-alert', 'alert-warning', 'Ожидайте своего хода');
+                return;
+            }
+            const body = await this.GameApi.attack(cell.x, cell.y);
+            if (body?.status === 'ok') {
+                this.addBattleLog(`⚔️ Захват [${cell.x},${cell.y}] | Войск осталось: ${body.troops}`);
+                this.selectedCell = null;
+                document.getElementById('build-panel')?.classList.add('hidden');
+                await this.loadMap(); await this.checkGameState();
+            } else { window.showAlert('turn-alert', 'alert-error', body?.message || 'Атака провалена'); }
+        }
+
+        async checkGameState() {
+            try {
+                const body = await this.GameApi.getGameState();
+                if (body) {
+                    this.gameState = body;
+                    document.getElementById('turn-number').innerText = body.turn || 1;
+                    document.getElementById('current-player').innerText = body.currentTurnPlayer || '-';
+                    const startBtn = document.getElementById('start-turn-btn'), endBtn = document.getElementById('end-turn-btn');
+                    const turnStatus = document.getElementById('turn-status');
+                    if (body.winner) {
+                        turnStatus.innerHTML = `🏆 ПОБЕДИТЕЛЬ: ${body.winner} ! 🏆`;
+                        startBtn?.classList.add('hidden'); endBtn?.classList.add('hidden');
+                        document.getElementById('build-panel')?.classList.add('hidden');
+                        return;
+                    }
+                    if (body.canEndTurn) {
+                        startBtn?.classList.add('hidden'); endBtn?.classList.remove('hidden');
+                        turnStatus.innerHTML = body.hasCapturedThisTurn ? '⚡ Клетка захвачена. Завершите ход' : '🎲 Ваш ход! Атакуйте или стройте';
+                    } else if (body.canStartTurn) {
+                        startBtn?.classList.remove('hidden'); endBtn?.classList.add('hidden');
+                        turnStatus.innerHTML = '🎯 Нажмите "Начать ход" для получения ресурсов';
+                        document.getElementById('build-panel')?.classList.add('hidden');
+                        this.selectedCell = null; this.buildMode = false;
+                        document.getElementById('build-mode-btn')?.classList.remove('btn-active');
+                    } else {
+                        startBtn?.classList.add('hidden'); endBtn?.classList.add('hidden');
+                        turnStatus.innerHTML = `⏳ Ход: ${body.currentTurnPlayer || 'противник'}`;
+                        document.getElementById('build-panel')?.classList.add('hidden');
+                        this.buildMode = false;
+                        document.getElementById('build-mode-btn')?.classList.remove('btn-active');
+                    }
+                    this.updateResources(body);
+                    this.renderMap();
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        updateResources(state) {
+            const ids = ['gold', 'wood', 'food', 'total-troops', 'my-cells'];
+            const keys = ['myGold', 'myWood', 'myFood', 'myTroops', 'myCells'];
+            ids.forEach((id, i) => { const el = document.getElementById(id); if (el) el.innerText = state[keys[i]] ?? 0; });
+        }
+
+        async loadLeaderboard() {
+            try {
+                const data = await this.GameApi.getLeaderboard();
+                if (data && Array.isArray(data)) {
+                    const container = document.getElementById('leaderboard-list');
+                    if (container) {
+                        container.innerHTML = data.map((p, idx) => `<div class="flex justify-between items-center border-b border-white/10 py-2"><span class="${idx < 3 ? 'text-amber-400 font-bold' : 'text-white/80'}">${idx+1}. ${p.name}</span><span class="badge badge-ghost bg-black/40">🏆 ${p.totalWins || 0}</span></div>`).join('');
+                    }
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        addBattleLog(msg) {
+            const logDiv = document.getElementById('battle-log');
+            if (!logDiv) return;
+            const entry = document.createElement('div');
+            entry.innerHTML = `⏱️ ${new Date().toLocaleTimeString()}  ${msg}`;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+            while (logDiv.children.length > 50) logDiv.removeChild(logDiv.lastChild);
+        }
+
+        setupEventListeners() {
+            document.getElementById('start-turn-btn')?.addEventListener('click', async () => {
+                const body = await this.GameApi.startTurn();
+                if (body?.success) {
+                    this.addBattleLog('🎮 Начат новый ход, ресурсы получены');
+                    this.selectedCell = null; this.buildMode = false;
+                    document.getElementById('build-panel')?.classList.add('hidden');
+                    document.getElementById('build-mode-btn')?.classList.remove('btn-active');
+                    await this.checkGameState(); await this.loadMap();
+                } else window.showAlert('turn-alert', 'alert-error', body?.message);
+            });
+            document.getElementById('end-turn-btn')?.addEventListener('click', async () => {
+                const body = await this.GameApi.endTurn();
+                if (body?.success) {
+                    this.addBattleLog('✅ Ход передан сопернику');
+                    this.selectedCell = null; this.buildMode = false;
+                    document.getElementById('build-panel')?.classList.add('hidden');
+                    document.getElementById('build-mode-btn')?.classList.remove('btn-active');
+                    await this.checkGameState(); await this.loadMap();
+                } else window.showAlert('turn-alert', 'alert-error', body?.message);
+            });
+            document.getElementById('build-mode-btn')?.addEventListener('click', () => this.toggleBuildMode());
+        }
+        async resetGame() { await this.GameApi.reset(); await this.loadMap(); await this.checkGameState(); }
+    }
+    if (typeof module !== 'undefined' && module.exports) module.exports = GeoStratGame;
+    window.GeoStratGame = GeoStratGame;
 </script>
 </body>
 </html>

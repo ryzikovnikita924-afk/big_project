@@ -1,5 +1,8 @@
 const AuthApi = (() => {
 
+    let cachedUserId = null;
+    let cachedUserInfo = null;
+
     async function request(url, options = {}) {
         const response = await fetch(url, {
             ...options,
@@ -21,6 +24,11 @@ const AuthApi = (() => {
         try {
             const { response, body } = await request("/api/me");
 
+            if (response.status === 200 && body?.authenticated) {
+                cachedUserInfo = body.userInfo;
+                cachedUserId = body.userInfo?.preferred_username || body.userInfo?.email || body.userInfo?.user;
+            }
+
             return {
                 status: response.status,
                 body
@@ -32,6 +40,14 @@ const AuthApi = (() => {
         }
     }
 
+    function getUserId() {
+        return cachedUserId;
+    }
+
+    function getUserInfo() {
+        return cachedUserInfo;
+    }
+
     function login(returnTo = "/index.html") {
         window.location.href = `/oauth2/start?rd=${encodeURIComponent(returnTo)}`;
     }
@@ -41,10 +57,27 @@ const AuthApi = (() => {
     }
 
     function extractDisplayName(info = {}) {
-        return info.email || info.preferred_username || info.user || "Игрок";
+        return info.preferred_username || info.email || info.user || "Игрок";
     }
 
-    return { getCurrentUser, login, logout, extractDisplayName };
+    function showAlert(elementId, type, message) {
+        const alertDiv = document.getElementById(elementId);
+        if (!alertDiv) return;
+        alertDiv.innerHTML = `<div class="alert ${type} shadow-lg"><span>${message}</span></div>`;
+        setTimeout(() => {
+            if (alertDiv.firstChild) alertDiv.removeChild(alertDiv.firstChild);
+        }, 5000);
+    }
+
+    return {
+        getCurrentUser,
+        getUserId,
+        getUserInfo,
+        login,
+        logout,
+        extractDisplayName,
+        showAlert
+    };
 })();
 
 window.AuthApi = AuthApi;

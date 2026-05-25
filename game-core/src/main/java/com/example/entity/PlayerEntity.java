@@ -17,7 +17,7 @@ public class PlayerEntity {
     @Column(name = "email", unique = true)
     private String email;
 
-    @Column(name = "password")  // ← ДОБАВЬТЕ ЭТО ПОЛЕ
+    @Column(name = "password")
     private String password;
 
     @Column(name = "auth_id", unique = true)

@@ -56,10 +56,9 @@ public class StatisticsService {
     }
 
     @Transactional
-    public void updatePlayerStats(PlayerEntity player, int cellsCaptured, int troopsKilled, int score, boolean isWinner) {
+    public void updatePlayerStats(PlayerEntity player, int cellsCaptured, int score, boolean isWinner) {
         player.setTotalGames(player.getTotalGames() + 1);
         player.setTotalCellsCaptured(player.getTotalCellsCaptured() + cellsCaptured);
-        player.setTotalTroopsKilled(player.getTotalTroopsKilled() + troopsKilled);
         player.setTotalScore(player.getTotalScore() + score);
         player.setLastPlayed(LocalDateTime.now());
 
@@ -72,16 +71,15 @@ public class StatisticsService {
 
     @Transactional
     public void addGameHistory(String gameId, PlayerEntity player, boolean isWinner,
-                               int cellsCaptured, int troopsKilled, int turnsPlayed) {
+                               int cellsCaptured, int turnsPlayed) {
         GameHistoryEntity history = new GameHistoryEntity();
         history.setPlayer(player);
         history.setGameId(gameId);
         history.setPlayerName(player.getName());
         history.setWinner(isWinner);
         history.setCellsCaptured(cellsCaptured);
-        history.setTroopsKilled(troopsKilled);
         history.setTurnsPlayed(turnsPlayed);
-        history.setFinalScore(calculateScore(cellsCaptured, troopsKilled, isWinner));
+        history.setFinalScore(calculateScore(cellsCaptured, isWinner));
         history.setPlayedAt(LocalDateTime.now());
         history.setDurationMinutes(0);
 
@@ -101,7 +99,7 @@ public class StatisticsService {
         history.setCellsCaptured(cellsCaptured);
         history.setTroopsKilled(troopsKilled);
         history.setTurnsPlayed(turnsPlayed);
-        history.setFinalScore(calculateScore(cellsCaptured, troopsKilled, isWinner));
+        history.setFinalScore(calculateScore(cellsCaptured, isWinner));
         history.setPlayedAt(LocalDateTime.now());
         history.setDurationMinutes(durationMinutes);
 
@@ -128,6 +126,10 @@ public class StatisticsService {
         return playerRepository.save(newPlayer);
     }
 
+    public PlayerRepository getPlayerRepository() {
+        return playerRepository;
+    }
+
     public void startNewGameSession(String gameId, List<Player> players) {
         System.out.println("✅ Начата новая игровая сессия: " + gameId + " с " + players.size() + " игроками");
     }
@@ -138,8 +140,8 @@ public class StatisticsService {
                 ", ходов: " + totalTurns);
     }
 
-    private int calculateScore(int cellsCaptured, int troopsKilled, boolean isWinner) {
-        int score = cellsCaptured * 10 + troopsKilled;
+    private int calculateScore(int cellsCaptured, boolean isWinner) {
+        int score = cellsCaptured * 10;
         if (isWinner) score += 100;
         return score;
     }

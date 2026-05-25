@@ -108,7 +108,7 @@ public class TurnService {
             if (cell != null && !cell.isWater()) {
                 int production = cell.getCurrentProduction();
 
-                // Базовое производство от местности
+
                 switch (cell.getTerrain()) {
                     case CITY:
                         goldIncome += production;
@@ -127,7 +127,7 @@ public class TurnService {
                         System.out.println("  " + cell.getTerrain() + " [" + cell.getX() + "," + cell.getY() + "]: +" + (production/2) + " золота");
                 }
 
-                // Бонус от зданий
+
                 if (cell.hasBuilding()) {
                     goldIncome += cell.getGoldBonus();
                     woodIncome += cell.getWoodBonus();
@@ -148,7 +148,6 @@ public class TurnService {
         if (woodIncome > 0) player.addResource(ResourceType.WOOD, woodIncome);
         if (foodIncome > 0) player.addResource(ResourceType.FOOD, foodIncome);
 
-        // Бонусные войска от казарм
         if (troopBonus > 0) {
             player.addTroops(troopBonus);
             System.out.printf("⚔️ Бонус от казарм: +%d войск!%n", troopBonus);
