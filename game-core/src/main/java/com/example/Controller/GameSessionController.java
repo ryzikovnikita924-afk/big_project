@@ -57,7 +57,6 @@ public class GameSessionController {
 
     @PostMapping("/start-vs-ai")
     public Map<String, Object> startGameVsAI(@RequestBody Map<String, String> request, HttpServletRequest httpRequest) {
-        // Приоритет: из тела запроса, потом из заголовка, потом из сессии
         String userId = request.get("userId");
         if (userId == null || userId.isEmpty()) {
             userId = getUserId(httpRequest);

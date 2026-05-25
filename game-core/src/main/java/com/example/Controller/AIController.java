@@ -22,7 +22,6 @@ public class AIController {
         this.gameWorld = gameWorld;
         this.turnService = turnService;
 
-        // Запускаем AI поток
         startAIThread();
     }
 
@@ -103,7 +102,7 @@ public class AIController {
             System.out.println("🤖 AI поток запущен");
             while (true) {
                 try {
-                    Thread.sleep(2000); // Проверяем каждые 2 секунды
+                    Thread.sleep(2000);
 
                     if (!aiEnabled || aiPlayerId == null) {
                         continue;

@@ -77,97 +77,59 @@ public class PlayerEntity {
         this.totalScore = 0;
     }
 
-    // Конструктор с email
     public PlayerEntity(String id, String name, String email) {
         this(id, name);
         this.email = email;
     }
 
-    // Геттеры и сеттеры
+    // Геттеры
     public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-
     public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-
     public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-
-    public String getPassword() { return password; }  // ← ДОБАВЬТЕ
-    public void setPassword(String password) { this.password = password; }  // ← ДОБАВЬТЕ
-
+    public String getPassword() { return password; }
     public String getAuthId() { return authId; }
-    public void setAuthId(String authId) { this.authId = authId; }
-
     public String getAvatarUrl() { return avatarUrl; }
-    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
-
     public String getFirstName() { return firstName; }
-    public void setFirstName(String firstName) { this.firstName = firstName; }
-
     public String getLastName() { return lastName; }
-    public void setLastName(String lastName) { this.lastName = lastName; }
-
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-
     public LocalDateTime getLastLogin() { return lastLogin; }
-    public void setLastLogin(LocalDateTime lastLogin) { this.lastLogin = lastLogin; }
-
     public LocalDateTime getLastPlayed() { return lastPlayed; }
-    public void setLastPlayed(LocalDateTime lastPlayed) { this.lastPlayed = lastPlayed; }
-
     public int getTotalGames() { return totalGames; }
-    public void setTotalGames(int totalGames) { this.totalGames = totalGames; }
-
     public int getTotalWins() { return totalWins; }
-    public void setTotalWins(int totalWins) { this.totalWins = totalWins; }
-
     public int getTotalCellsCaptured() { return totalCellsCaptured; }
-    public void setTotalCellsCaptured(int totalCellsCaptured) { this.totalCellsCaptured = totalCellsCaptured; }
-
     public int getTotalTroopsKilled() { return totalTroopsKilled; }
-    public void setTotalTroopsKilled(int totalTroopsKilled) { this.totalTroopsKilled = totalTroopsKilled; }
-
     public int getTotalScore() { return totalScore; }
-    public void setTotalScore(int totalScore) { this.totalScore = totalScore; }
-
     public List<GameHistoryEntity> getGameHistory() { return gameHistory; }
-    public void setGameHistory(List<GameHistoryEntity> gameHistory) { this.gameHistory = gameHistory; }
-
     public boolean isOnline() { return isOnline; }
+
+    // Сеттеры
+    public void setId(String id) { this.id = id; }
+    public void setName(String name) { this.name = name; }
+    public void setEmail(String email) { this.email = email; }
+    public void setPassword(String password) { this.password = password; }
+    public void setAuthId(String authId) { this.authId = authId; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    public void setFirstName(String firstName) { this.firstName = firstName; }
+    public void setLastName(String lastName) { this.lastName = lastName; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public void setLastLogin(LocalDateTime lastLogin) { this.lastLogin = lastLogin; }
+    public void setLastPlayed(LocalDateTime lastPlayed) { this.lastPlayed = lastPlayed; }
+    public void setTotalGames(int totalGames) { this.totalGames = totalGames; }
+    public void setTotalWins(int totalWins) { this.totalWins = totalWins; }
+    public void setTotalCellsCaptured(int totalCellsCaptured) { this.totalCellsCaptured = totalCellsCaptured; }
+    public void setTotalTroopsKilled(int totalTroopsKilled) { this.totalTroopsKilled = totalTroopsKilled; }
+    public void setTotalScore(int totalScore) { this.totalScore = totalScore; }
+    public void setGameHistory(List<GameHistoryEntity> gameHistory) { this.gameHistory = gameHistory; }
     public void setOnline(boolean online) { isOnline = online; }
 
-    // Вспомогательные методы
-    public void incrementGames() {
-        this.totalGames++;
-    }
+    public void incrementGames() { this.totalGames++; }
+    public void incrementWins() { this.totalWins++; }
+    public void addCellsCaptured(int cells) { this.totalCellsCaptured += cells; }
+    public void addTroopsKilled(int troops) { this.totalTroopsKilled += troops; }
+    public void addScore(int score) { this.totalScore += score; }
+    public void updateLastPlayed() { this.lastPlayed = LocalDateTime.now(); }
+    public void updateLastLogin() { this.lastLogin = LocalDateTime.now(); }
 
-    public void incrementWins() {
-        this.totalWins++;
-    }
-
-    public void addCellsCaptured(int cells) {
-        this.totalCellsCaptured += cells;
-    }
-
-    public void addTroopsKilled(int troops) {
-        this.totalTroopsKilled += troops;
-    }
-
-    public void addScore(int score) {
-        this.totalScore += score;
-    }
-
-    public void updateLastPlayed() {
-        this.lastPlayed = LocalDateTime.now();
-    }
-
-    public void updateLastLogin() {
-        this.lastLogin = LocalDateTime.now();
-    }
-
-    // Для отображения в JSON
     public Map<String, Object> toMap() {
         Map<String, Object> map = new HashMap<>();
         map.put("id", id);
@@ -185,18 +147,5 @@ public class PlayerEntity {
     public String toString() {
         return String.format("PlayerEntity{id='%s', name='%s', email='%s', wins=%d, games=%d}",
                 id, name, email, totalWins, totalGames);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PlayerEntity that = (PlayerEntity) o;
-        return Objects.equals(id, that.id);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id);
     }
 }

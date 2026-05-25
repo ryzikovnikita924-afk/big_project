@@ -34,12 +34,18 @@ public class GameController {
     }
 
     private String getCurrentUserId(HttpServletRequest request) {
-        String userId = (String) request.getSession().getAttribute("userId");
+        String userId = request.getHeader("X-User-Id");
+        if (userId != null && !userId.isEmpty()) {
+            System.out.println("📌 Получен userId из заголовка: " + userId);
+            return userId;
+        }
+
+        userId = (String) request.getSession().getAttribute("userId");
         if (userId == null) {
             userId = "anonymous_" + System.currentTimeMillis();
             request.getSession().setAttribute("userId", userId);
         }
-        System.out.println("📌 Current userId: " + userId);
+        System.out.println("📌 Получен userId из сессии: " + userId);
         return userId;
     }
 
@@ -128,6 +134,7 @@ public class GameController {
                     }
                 }
                 setStatisticsUpdated(userId, true);
+                gamePersistenceService.clearSave(userId);
             }
             return state;
         }
@@ -565,12 +572,23 @@ public class GameController {
         return response;
     }
 
+    @PostMapping("/set-user-id")
+    public Map<String, Object> setUserId(@RequestBody Map<String, String> request, HttpServletRequest httpRequest) {
+        String userId = request.get("userId");
+        if (userId != null && !userId.isEmpty()) {
+            httpRequest.getSession().setAttribute("userId", userId);
+            System.out.println("🔧 User ID принудительно установлен: " + userId);
+            return Map.of("success", true, "userId", userId);
+        }
+        return Map.of("success", false, "message", "userId не указан");
+    }
+
     private void updateWinnerStatistics(Player winner) {
         try {
             PlayerEntity playerEntity = statisticsService.getOrCreatePlayer(winner.getId(), winner.getName());
             int cellsCaptured = winner.getCapturedCells().size();
 
-            statisticsService.updatePlayerStats(playerEntity, cellsCaptured, calculateGameScore(cellsCaptured, true), true);
+            statisticsService.updatePlayerStats(playerEntity, cellsCaptured, cellsCaptured * 10 + 100, true);
 
             String gameId = UUID.randomUUID().toString();
             statisticsService.addGameHistory(gameId, playerEntity, true, cellsCaptured, turnService.getTurnNumber());
@@ -578,6 +596,7 @@ public class GameController {
             System.out.println("✅ ПОБЕДА! Статистика обновлена для: " + winner.getName());
             System.out.println("   - Всего побед: " + playerEntity.getTotalWins());
             System.out.println("   - Всего игр: " + playerEntity.getTotalGames());
+
         } catch (Exception e) {
             System.err.println("❌ Ошибка при обновлении статистики победителя: " + e.getMessage());
             e.printStackTrace();
@@ -589,22 +608,17 @@ public class GameController {
             PlayerEntity playerEntity = statisticsService.getOrCreatePlayer(loser.getId(), loser.getName());
             int cellsCaptured = loser.getCapturedCells().size();
 
-            statisticsService.updatePlayerStats(playerEntity, cellsCaptured, calculateGameScore(cellsCaptured, false), false);
+            statisticsService.updatePlayerStats(playerEntity, cellsCaptured, cellsCaptured * 10, false);
 
             String gameId = UUID.randomUUID().toString();
             statisticsService.addGameHistory(gameId, playerEntity, false, cellsCaptured, turnService.getTurnNumber());
 
             System.out.println("📊 Статистика обновлена для проигравшего: " + loser.getName());
+
         } catch (Exception e) {
             System.err.println("❌ Ошибка при обновлении статистики проигравшего: " + e.getMessage());
             e.printStackTrace();
         }
-    }
-
-    private int calculateGameScore(int cellsCaptured, boolean isWinner) {
-        int score = cellsCaptured * 10;
-        if (isWinner) score += 100;
-        return score;
     }
 
     public void setCurrentPlayerId(String userId, String playerId) {
